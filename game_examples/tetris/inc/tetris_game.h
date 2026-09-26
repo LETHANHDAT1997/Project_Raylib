@@ -8,8 +8,8 @@ void ResetGame(TetrisGame *game);
 void UpdateGame(TetrisGame *game, float dt);
 void DrawGame(const TetrisGame *game);
 
-void AddParticles(TetrisGame *game, float x, float y, Color color, int count);
-void UpdateParticles(TetrisGame *game, float dt);
-void DrawParticles(const TetrisGame *game);
+void AddTetrisParticles(TetrisGame *game, float x, float y, Color color, int count);
+void UpdateTetrisParticles(TetrisGame *game, float dt);
+void DrawTetrisParticles(const TetrisGame *game);
 
 #endif // TETRIS_GAME_H

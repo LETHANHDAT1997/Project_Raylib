@@ -1,38 +1,44 @@
 #ifndef IS_BUILD_ALL
 
 #include "raylib.h"
-#include "tetris_types.h"
-#include "tetris_game.h"
-#include "tetris_audio.h"
+#include "fighter_types.h"
+#include "fighter_game.h"
 #include <math.h>
+#include <stdlib.h>
 
 int main(void)
 {
-    // Cấu hình cờ cửa sổ: Tự do co giãn, đồng bộ VSync, khử răng cưa và hỗ trợ màn hình 4K/Retina
+    // Tắt bộ gõ tiếng Việt (Bamboo, ibus, fcitx) để tránh IME chặn phím game
+    setenv("XMODIFIERS", "@im=none", 1);
+    setenv("GTK_IM_MODULE", "", 1);
+    setenv("QT_IM_MODULE", "", 1);
+    setenv("GLFW_IM_MODULE", "none", 1);
+
+    // Cấu hình cửa sổ
     SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_VSYNC_HINT | FLAG_MSAA_4X_HINT | FLAG_WINDOW_HIGHDPI);
-    InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Raylib Tetris - Modern Classic Arcade");
+    InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Raylib Fighter - Street Fighter Style");
     SetTargetFPS(60);
 
-    // Khởi tạo Virtual Canvas cho game
+    // Virtual Canvas cho game (giữ tỷ lệ cố định)
     RenderTexture2D canvas = LoadRenderTexture(SCREEN_WIDTH, SCREEN_HEIGHT);
     SetTextureFilter(canvas.texture, TEXTURE_FILTER_BILINEAR);
 
-    InitTetrisAudio();
-
-    TetrisGame game;
-    InitGame(&game);
+    // Khởi tạo game
+    FighterGame game;
+    InitFighterGame(&game);
 
     while (!WindowShouldClose()) {
         float dt = GetFrameTime();
         if (dt > 0.05f) dt = 0.05f;
 
-        // Phím F11: Chuyển đổi toàn màn hình
+        // F11: Fullscreen
         if (IsKeyPressed(KEY_F11)) {
             ToggleFullscreen();
         }
 
-        // Tính toán tỷ lệ scale và vùng hiển thị Letterbox đối xứng
-        float scale = fminf((float)GetScreenWidth() / SCREEN_WIDTH, (float)GetScreenHeight() / SCREEN_HEIGHT);
+        // Letterbox scaling
+        float scale = fminf((float)GetScreenWidth() / SCREEN_WIDTH,
+                           (float)GetScreenHeight() / SCREEN_HEIGHT);
         if (scale <= 0.0f) scale = 1.0f;
         float destW = SCREEN_WIDTH * scale;
         float destH = SCREEN_HEIGHT * scale;
@@ -43,28 +49,27 @@ int main(void)
         };
         Rectangle sourceRec = {0.0f, 0.0f, (float)SCREEN_WIDTH, -(float)SCREEN_HEIGHT};
 
-        // Chuyển đổi tọa độ chuột ảo tự động
+        // Virtual mouse
         SetMouseOffset((int)-destRec.x, (int)-destRec.y);
         SetMouseScale(1.0f / scale, 1.0f / scale);
 
-        UpdateGame(&game, dt);
+        // Update
+        UpdateFighterGame(&game, dt);
 
-        // 1. Vẽ game lên Virtual Canvas
+        // Render to canvas
         BeginTextureMode(canvas);
-            DrawGame(&game);
+            DrawFighterGame(&game);
         EndTextureMode();
 
-        // 2. Vẽ Virtual Canvas đã scale lên cửa sổ thật
+        // Render canvas to screen
         BeginDrawing();
             ClearBackground(BLACK);
-            DrawTexturePro(canvas.texture, sourceRec, destRec, (Vector2){0.0f, 0.0f}, 0.0f, WHITE);
+            DrawTexturePro(canvas.texture, sourceRec, destRec,
+                          (Vector2){0.0f, 0.0f}, 0.0f, WHITE);
         EndDrawing();
     }
 
-    CloseTetrisAudio();
-    if (IsAudioDeviceReady()) {
-        CloseAudioDevice();
-    }
+    CloseFighterGame(&game);
     UnloadRenderTexture(canvas);
     CloseWindow();
 

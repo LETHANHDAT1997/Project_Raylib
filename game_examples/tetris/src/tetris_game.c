@@ -26,7 +26,7 @@ static void DrawBeveledCell(int x, int y, int size, Color color, float alpha)
     DrawRectangle(x + size - 2, y, 2, size, dark);
 }
 
-void AddParticles(TetrisGame *game, float x, float y, Color color, int count)
+void AddTetrisParticles(TetrisGame *game, float x, float y, Color color, int count)
 {
     for (int i = 0; i < count; i++) {
         if (game->particleCount >= MAX_PARTICLES) break;
@@ -44,7 +44,7 @@ void AddParticles(TetrisGame *game, float x, float y, Color color, int count)
     }
 }
 
-void UpdateParticles(TetrisGame *game, float dt)
+void UpdateTetrisParticles(TetrisGame *game, float dt)
 {
     for (int i = 0; i < game->particleCount; i++) {
         Particle *p = &game->particles[i];
@@ -62,7 +62,7 @@ void UpdateParticles(TetrisGame *game, float dt)
     }
 }
 
-void DrawParticles(const TetrisGame *game)
+void DrawTetrisParticles(const TetrisGame *game)
 {
     for (int i = 0; i < game->particleCount; i++) {
         const Particle *p = &game->particles[i];
@@ -133,7 +133,7 @@ static void HandleHoldPiece(TetrisGame *game)
 
 void UpdateGame(TetrisGame *game, float dt)
 {
-    UpdateParticles(game, dt);
+    UpdateTetrisParticles(game, dt);
 
     // Mute sound toggle
     if (IsKeyPressed(KEY_M)) {
@@ -225,7 +225,7 @@ void UpdateGame(TetrisGame *game, float dt)
                 if (GetPieceCell(game->current.type, game->current.rotation, r, c)) {
                     float px = BOARD_OFFSET_X + (game->current.x + c) * CELL_SIZE + CELL_SIZE * 0.5f;
                     float py = BOARD_OFFSET_Y + (game->current.y + r + 1) * CELL_SIZE;
-                    AddParticles(game, px, py, GetPieceColor(game->current.type), 6);
+                    AddTetrisParticles(game, px, py, GetPieceColor(game->current.type), 6);
                 }
             }
         }
@@ -385,7 +385,7 @@ void DrawGame(const TetrisGame *game)
     }
 
     // Particles
-    DrawParticles(game);
+    DrawTetrisParticles(game);
 
     // ==========================================
     // LEFT SIDEBAR (HOLD, LEVEL, LINES, COMBO)

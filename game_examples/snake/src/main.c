@@ -1,26 +1,30 @@
 #ifndef IS_BUILD_ALL
 
 #include "raylib.h"
-#include "tetris_types.h"
-#include "tetris_game.h"
-#include "tetris_audio.h"
+#include "snake_types.h"
+#include "snake_game.h"
+#include "snake_audio.h"
+#include "font_vn.h"
 #include <math.h>
 
 int main(void)
 {
     // Cấu hình cờ cửa sổ: Tự do co giãn, đồng bộ VSync, khử răng cưa và hỗ trợ màn hình 4K/Retina
     SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_VSYNC_HINT | FLAG_MSAA_4X_HINT | FLAG_WINDOW_HIGHDPI);
-    InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Raylib Tetris - Modern Classic Arcade");
+    InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Raylib Snake - Rắn Săn Mồi Retro Arcade");
     SetTargetFPS(60);
+
+    // Tải font Unicode Tiếng Việt
+    InitVietnameseFont();
 
     // Khởi tạo Virtual Canvas cho game
     RenderTexture2D canvas = LoadRenderTexture(SCREEN_WIDTH, SCREEN_HEIGHT);
     SetTextureFilter(canvas.texture, TEXTURE_FILTER_BILINEAR);
 
-    InitTetrisAudio();
+    InitSnakeAudio();
 
-    TetrisGame game;
-    InitGame(&game);
+    SnakeGame game;
+    InitSnakeGame(&game);
 
     while (!WindowShouldClose()) {
         float dt = GetFrameTime();
@@ -43,15 +47,15 @@ int main(void)
         };
         Rectangle sourceRec = {0.0f, 0.0f, (float)SCREEN_WIDTH, -(float)SCREEN_HEIGHT};
 
-        // Chuyển đổi tọa độ chuột ảo tự động
+        // Chuyển đổi tọa độ chuột ảo tự động cho các nút bấm trong game Snake
         SetMouseOffset((int)-destRec.x, (int)-destRec.y);
         SetMouseScale(1.0f / scale, 1.0f / scale);
 
-        UpdateGame(&game, dt);
+        UpdateSnakeGame(&game, dt);
 
         // 1. Vẽ game lên Virtual Canvas
         BeginTextureMode(canvas);
-            DrawGame(&game);
+            DrawSnakeGame(&game);
         EndTextureMode();
 
         // 2. Vẽ Virtual Canvas đã scale lên cửa sổ thật
@@ -61,10 +65,13 @@ int main(void)
         EndDrawing();
     }
 
-    CloseTetrisAudio();
+    CloseSnakeGame(&game);
+    CloseSnakeAudio();
+
     if (IsAudioDeviceReady()) {
         CloseAudioDevice();
     }
+    CloseVietnameseFont();
     UnloadRenderTexture(canvas);
     CloseWindow();
 

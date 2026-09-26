@@ -109,7 +109,7 @@ void LockCurrentPiece(TetrisGame *game)
                     // Particle on impact
                     float px = BOARD_OFFSET_X + bx * CELL_SIZE + CELL_SIZE * 0.5f;
                     float py = BOARD_OFFSET_Y + by * CELL_SIZE + CELL_SIZE * 0.5f;
-                    AddParticles(game, px, py, pieceColor, 4);
+                    AddTetrisParticles(game, px, py, pieceColor, 4);
                 }
             }
         }

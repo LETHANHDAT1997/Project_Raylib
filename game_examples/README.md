@@ -1,6 +1,6 @@
-# 🎮 Raylib Game Examples
+# 🎮 Raylib Game Examples & Arcade Master Hub
 
-Tuyển tập 2 trò chơi cổ điển được xây dựng bằng **C** và thư viện đồ họa **Raylib**, chia tách mã nguồn rõ ràng theo chuẩn `src/` và `inc/`, hỗ trợ cấu hình CMake độc lập hoặc toàn cục, kèm script `build_and_run.sh` cho từng game.
+Tuyển tập 3 trò chơi cổ điển được xây dựng bằng **C** và thư viện đồ họa **Raylib**, tích hợp kiến trúc **Virtual Canvas tự động thích ứng với mọi độ phân giải màn hình (HD, Full HD, 2K, 4K, Fullscreen)** và trình khởi động trung tâm **`game_boot` (Arcade Master Hub)**.
 
 ---
 
@@ -8,111 +8,109 @@ Tuyển tập 2 trò chơi cổ điển được xây dựng bằng **C** và th
 
 ```text
 game_examples/
-├── CMakeLists.txt              # CMake tổng để cấu hình & build tất cả game cùng lúc
-├── build_all.sh                # Script build toàn bộ các game vào thư mục build/
+├── CMakeLists.txt              # CMake tổng cấu hình & build tất cả game + Arcade Hub
+├── build_all.sh                # Script build toàn bộ dự án vào thư mục build/
 ├── README.md                   # Tài liệu hướng dẫn
 │
-├── tetris/                     # Game 1: Xếp Gạch Cổ Điển Hiện Đại
-│   ├── CMakeLists.txt          # CMake độc lập cho Tetris
-│   ├── build_and_run.sh        # Script build và khởi chạy riêng cho Tetris
-│   ├── inc/                    # Thư mục Header files (.h)
-│   │   ├── tetris_types.h      # Khai báo kiểu dữ liệu, struct bảng, mảnh ghép
-│   │   ├── tetris_piece.h      # Ma trận 7 khối tetromino, thuật toán 7-bag
-│   │   ├── tetris_board.h      # Xử lý va chạm, lock piece, xóa hàng, bóng ghost
-│   │   ├── tetris_audio.h      # Tạo âm thanh 8-bit procedural waveform
-│   │   └── tetris_game.h       # Vòng lặp game, điểm số, combo, hạt particle
-│   └── src/                    # Thư mục Source files (.c)
-│       ├── main.c              # Hàm main, khởi tạo cửa sổ Raylib
-│       ├── tetris_piece.c
-│       ├── tetris_board.c
-│       ├── tetris_audio.c
-│       └── tetris_game.c
+├── game_boot/                  # 🚀 [MASTER LAUNCHER] Trình chọn game & Canvas trung tâm
+│   ├── CMakeLists.txt          # CMake cho game_boot với cờ -DIS_BUILD_ALL
+│   ├── build_and_run.sh        # Script build và khởi chạy Arcade Hub
+│   ├── inc/
+│   │   ├── boot_types.h        # Quản lý trạng thái chuyển cảnh, struct canvas
+│   │   ├── boot_canvas.h       # Quản lý Virtual Canvas, tỉ lệ scale, căn giữa màn hình
+│   │   └── boot_menu.h         # Giao diện Arcade Hub chọn game, 3 card tương tác
+│   └── src/
+│       ├── main.c              # Hàm main của Hub, điều phối game và xử lý phím F1/F11
+│       ├── boot_canvas.c       # Tính toán letterbox, tự động căn chỉnh tọa độ chuột
+│       └── boot_menu.c         # Vẽ giao diện chọn game, icon pixel-art
 │
-└── space_invader/              # Game 2: Bắn Ruồi / Space Invaders Cổ Điển
-    ├── CMakeLists.txt          # CMake độc lập cho Space Invader
-    ├── build_and_run.sh        # Script build và khởi chạy riêng cho Space Invader
-    ├── inc/                    # Thư mục Header files (.h)
-    │   ├── space_types.h       # Định nghĩa tàu, 55 quái ngoài hành tinh, khiên, đạn
-    │   ├── space_player.h      # Pháo phòng thủ người chơi, di chuyển, mạng
-    │   ├── space_aliens.h      # Pixel-art bitmaps, hàng ngũ quái, đĩa bay UFO
-    │   ├── space_bunker.h      # 4 boongke phòng thủ phá hủy từng khối nhỏ
-    │   ├── space_audio.h       # Âm thanh laser, nổ, nhịp hành quân 4 nốt
-    │   └── space_game.h        # Vòng lặp game, va chạm, sao vũ trụ, hiệu ứng CRT
-    └── src/                    # Thư mục Source files (.c)
-        ├── main.c              # Hàm main, khởi tạo cửa sổ Raylib
-        ├── space_player.c
-        ├── space_aliens.c
-        ├── space_bunker.c
-        ├── space_audio.c
-        └── space_game.c
+├── tetris/                     # Game 1: Xếp Gạch Cổ Điển Hiện Đại (780x740)
+│   ├── CMakeLists.txt          # CMake độc lập cho Tetris
+│   ├── build_and_run.sh        # Script build và chạy Tetris độc lập
+│   ├── inc/                    # tetris_types.h, tetris_game.h, tetris_runner.h, ...
+│   └── src/                    # main.c, tetris_game.c, tetris_runner.c, ...
+│
+├── space_invader/              # Game 2: Bắn Ruồi Không Gian (800x880)
+│   ├── CMakeLists.txt          # CMake độc lập cho Space Invader
+│   ├── build_and_run.sh        # Script build và chạy Space Invader độc lập
+│   ├── inc/                    # space_types.h, space_game.h, space_runner.h, ...
+│   └── src/                    # main.c, space_game.c, space_runner.c, ...
+│
+└── snake/                      # Game 3: Rắn Săn Mồi Retro Edition (960x720)
+    ├── CMakeLists.txt          # CMake độc lập cho Snake
+    ├── build_and_run.sh        # Script build và chạy Snake độc lập
+    ├── inc/                    # snake_types.h, snake_game.h, snake_runner.h, ...
+    └── src/                    # main.c, snake_game.c, snake_runner.c, ...
 ```
 
 ---
 
-## 🚀 Cách Build Và Chạy Từng Game
+## 🌟 Kiến Trúc "Virtual Canvas" & Macro `IS_BUILD_ALL`
+
+1. **Virtual Canvas (Độ phân giải ảo)**:
+   * Toàn bộ logic hiển thị của mỗi trò chơi được vẽ lên một tấm canvas ảo cố định độ phân giải gốc của nó (`RenderTexture2D`).
+   * Cửa sổ hiển thị của Raylib được cấu hình cờ: `FLAG_WINDOW_RESIZABLE | FLAG_VSYNC_HINT | FLAG_MSAA_4X_HINT | FLAG_WINDOW_HIGHDPI`.
+   * Canvas ảo được tự động phóng to/thu nhỏ (Scale) tỷ lệ chuẩn lên bất kỳ màn hình nào (kể cả 2K, 4K hay kéo góc cửa sổ tự do) với viền đen cân đối (*Letterbox*), không bao giờ bị méo hình.
+   * Tọa độ chuột được tự động chuyển đổi qua `SetMouseOffset` và `SetMouseScale`, giúp các nút bấm giao diện luôn nhấp chuột chuẩn xác trên mọi kích thước cửa sổ.
+2. **Cơ chế Macro `IS_BUILD_ALL`**:
+   * Khi build riêng lẻ từng thư mục con (`tetris/`, `space_invader/`, `snake/`): Macro `IS_BUILD_ALL` không bật, file `main.c` của game đó được biên dịch thành file thực thi độc lập (đã tích hợp sẵn Virtual Canvas).
+   * Khi build qua `game_boot`: Macro `-DIS_BUILD_ALL` được bật, các file `main.c` con sẽ tự động bỏ qua hàm `main()`, thay vào đó `game_boot` điều phối game thông qua các giao diện Runner (`Init...App`, `Update...App`, `Draw...App`, `Close...App`).
+
+---
+
+## 🚀 Cách Chạy Trình Khởi Động Trung Tâm (`game_boot`)
+
+Khởi động Arcade Master Hub để chọn và chuyển đổi giữa tất cả các game:
+
+```bash
+cd game_examples/game_boot
+./build_and_run.sh
+```
+
+**🎮 Phím điều khiển trong Arcade Hub:**
+* **Mũi tên Trái / Phải** hoặc **A / D**: Chọn thẻ game
+* **Phím số 1, 2, 3**: Chọn nhanh game tương ứng
+* **ENTER / SPACE** hoặc **Click Chuột**: Vào chơi game đã chọn
+* **F11**: Bật / Tắt chế độ Toàn Màn Hình (*Fullscreen*)
+* **F1** hoặc **HOME**: Đang chơi game bất kỳ có thể nhấn để **quay lại Arcade Hub** ngay lập tức!
+
+---
+
+## 🕹️ Cách Build Và Chạy Từng Game Độc Lập
+
+Bạn vẫn có thể vào từng thư mục để biên dịch và chạy riêng biệt từng game:
 
 ### 1. Game Tetris
-Vào thư mục `game_examples/tetris` và chạy script:
-
 ```bash
 cd game_examples/tetris
 ./build_and_run.sh
 ```
-
-Hoặc build thủ công bằng CMake:
-```bash
-cd game_examples/tetris
-cmake -B build -S . -DCMAKE_BUILD_TYPE=Release
-cmake --build build -j$(nproc)
-./build/tetris
-```
-
-**🎮 Phím điều khiển Tetris:**
-- **Mũi tên Trái / Phải** hoặc **A / D**: Di chuyển mảnh ghép sang trái/phải
-- **Mũi tên Lên / W / X**: Xoay mảnh ghép thuận chiều kim đồng hồ
-- **Z**: Xoay ngược chiều kim đồng hồ
-- **Mũi tên Xuống / S**: Thả nhanh (Soft Drop)
-- **Space**: Thả rơi tức thì và khóa mảnh (Hard Drop)
-- **C** hoặc **Left Shift**: Giữ mảnh ghép (Hold Piece)
-- **P** hoặc **ESC**: Tạm dừng (Pause / Resume)
-- **M**: Bật / Tắt âm thanh (Mute)
-- **Enter** hoặc **R**: Chơi lại khi Game Over
-
----
 
 ### 2. Game Space Invader
-Vào thư mục `game_examples/space_invader` và chạy script:
-
 ```bash
 cd game_examples/space_invader
 ./build_and_run.sh
 ```
 
-Hoặc build thủ công bằng CMake:
+### 3. Game Snake
 ```bash
-cd game_examples/space_invader
-cmake -B build -S . -DCMAKE_BUILD_TYPE=Release
-cmake --build build -j$(nproc)
-./build/space_invader
+cd game_examples/snake
+./build_and_run.sh
 ```
-
-**🎮 Phím điều khiển Space Invader:**
-- **Mũi tên Trái / Phải** hoặc **A / D**: Di chuyển pháo phòng thủ
-- **Phím Cách (Space) / W / Mũi tên Lên**: Bắn đạn laser
-- **M**: Bật / Tắt âm thanh
-- **Enter / Space / R**: Bắt đầu game từ Menu / Chơi lại khi Game Over
 
 ---
 
-## ⚡ Build Cả 2 Game Bằng CMake Tổng
+## ⚡ Build Toàn Bộ Dự Án Bằng Script Tổng
 
-Nếu bạn muốn build cả hai game cùng một lúc từ thư mục `game_examples`:
+Chạy script tổng tại thư mục `game_examples`:
 
 ```bash
 cd game_examples
 ./build_all.sh
 ```
 
-File thực thi của 2 game sẽ được tạo tại:
-- `./build/tetris/tetris`
-- `./build/space_invader/space_invader`
+Tất cả 4 file thực thi sẽ được tạo sẵn trong thư mục `build/`:
+* `./build/game_boot/game_boot` *(Arcade Master Hub)*
+* `./build/tetris/tetris`
+* `./build/space_invader/space_invader`
+* `./build/snake/snake`

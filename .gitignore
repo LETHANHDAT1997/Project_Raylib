@@ -44,6 +44,7 @@ ipch/
 *.opensdf
 *.db
 *.opendb
+*.dat
 packages/
 !examples/models/resources/models/obj/
 
