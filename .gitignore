@@ -96,3 +96,8 @@ build
 
 
 
+
+# Dữ liệu runtime của Arcade Hub (thống kê & cài đặt người dùng)
+game_boot_stats.txt
+game_boot_settings.txt
+arcade_hub_screenshot.png

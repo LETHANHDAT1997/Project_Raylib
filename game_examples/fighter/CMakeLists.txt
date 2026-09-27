@@ -1,8 +1,10 @@
 cmake_minimum_required(VERSION 3.16)
-project(fighter C)
+project(fighter C CXX)
 
 set(CMAKE_C_STANDARD 99)
 set(CMAKE_C_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # Find or include raylib
@@ -25,8 +27,9 @@ if(NOT TARGET raylib)
     endif()
 endif()
 
-file(GLOB_RECURSE FIGHTER_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/*.c")
-file(GLOB COMMON_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/../common/*.c")
+# Game viết bằng C++; phần font tiếng Việt dùng chung vẫn là C.
+file(GLOB_RECURSE FIGHTER_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp")
+file(GLOB COMMON_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/../common/*.c")
 
 add_executable(fighter ${FIGHTER_SOURCES} ${COMMON_SOURCES})
 

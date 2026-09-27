@@ -1,8 +1,11 @@
 cmake_minimum_required(VERSION 3.16)
-project(game_boot C)
+project(game_boot C CXX)
 
 set(CMAKE_C_STANDARD 99)
 set(CMAKE_C_STANDARD_REQUIRED ON)
+# Fighter được viết bằng C++ (OOP), các game còn lại vẫn là C thuần.
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # Find or include raylib
@@ -25,12 +28,31 @@ if(NOT TARGET raylib)
     endif()
 endif()
 
-file(GLOB BOOT_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/*.c")
-file(GLOB TETRIS_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/../tetris/src/*.c")
-file(GLOB SPACE_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/../space_invader/src/*.c")
-file(GLOB SNAKE_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/../snake/src/*.c")
-file(GLOB FIGHTER_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/../fighter/src/*.c")
-file(GLOB COMMON_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/../common/*.c")
+# raylib mặc định build KHÔNG kèm bộ giải mã JPEG (config.h: SUPPORT_FILEFORMAT_JPG 0),
+# nên ảnh .jpg thả vào assets/wallpapers sẽ không nạp được. Bật lên tại đây.
+# config.h dùng #ifndef nên định nghĩa từ dòng lệnh sẽ được ưu tiên.
+if(TARGET raylib)
+    target_compile_definitions(raylib PRIVATE SUPPORT_FILEFORMAT_JPG=1)
+endif()
+
+# Nguồn của launcher được gom theo tầng: core (logic), ui (thư viện kính),
+# hub (các màn hình). Thêm file mới vào đúng thư mục là CMake tự nhận.
+#
+# CONFIGURE_DEPENDS bắt CMake quét lại thư mục mỗi lần build. Không có nó,
+# file .c mới thêm sẽ bị bỏ qua cho tới khi chạy lại cmake bằng tay - lỗi
+# link khó hiểu mà ai cũng vấp một lần.
+file(GLOB BOOT_SOURCES CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/*.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/core/*.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/*.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/hub/*.c"
+)
+file(GLOB TETRIS_SOURCES  CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/../tetris/src/*.c")
+file(GLOB SPACE_SOURCES   CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/../space_invader/src/*.c")
+file(GLOB SNAKE_SOURCES   CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/../snake/src/*.c")
+# Fighter là C++ và chia theo thư mục con (core/entities/characters/render/scenes).
+file(GLOB_RECURSE FIGHTER_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/../fighter/src/*.cpp")
+file(GLOB COMMON_SOURCES  CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/../common/*.c")
 
 add_executable(game_boot 
     ${BOOT_SOURCES}
@@ -46,6 +68,9 @@ target_compile_definitions(game_boot PRIVATE IS_BUILD_ALL)
 
 target_include_directories(game_boot PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/inc"
+    "${CMAKE_CURRENT_SOURCE_DIR}/inc/core"
+    "${CMAKE_CURRENT_SOURCE_DIR}/inc/ui"
+    "${CMAKE_CURRENT_SOURCE_DIR}/inc/hub"
     "${CMAKE_CURRENT_SOURCE_DIR}/../common"
     "${CMAKE_CURRENT_SOURCE_DIR}/../tetris/inc"
     "${CMAKE_CURRENT_SOURCE_DIR}/../space_invader/inc"

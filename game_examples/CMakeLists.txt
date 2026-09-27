@@ -1,8 +1,11 @@
 cmake_minimum_required(VERSION 3.16)
-project(game_examples C)
+project(game_examples C CXX)
 
 set(CMAKE_C_STANDARD 99)
 set(CMAKE_C_STANDARD_REQUIRED ON)
+# fighter dùng C++17; các example khác vẫn là C thuần.
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # Configure raylib once for all game examples
@@ -23,6 +26,13 @@ if(NOT TARGET raylib)
             FetchContent_MakeAvailable(raylib)
         endif()
     endif()
+endif()
+
+# raylib mặc định build KHÔNG kèm bộ giải mã JPEG (config.h: SUPPORT_FILEFORMAT_JPG 0),
+# nên ảnh .jpg thả vào assets/wallpapers sẽ không nạp được. Bật lên tại đây.
+# config.h dùng #ifndef nên định nghĩa từ dòng lệnh sẽ được ưu tiên.
+if(TARGET raylib)
+    target_compile_definitions(raylib PRIVATE SUPPORT_FILEFORMAT_JPG=1)
 endif()
 
 # Add each game subdirectory
