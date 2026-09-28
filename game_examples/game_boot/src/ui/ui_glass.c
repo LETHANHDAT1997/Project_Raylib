@@ -59,6 +59,34 @@ static Vector4 ColorToVec4(Color c)
     return (Vector4){c.r / 255.0f, c.g / 255.0f, c.b / 255.0f, c.a / 255.0f};
 }
 
+// Chọn header GLSL khớp với context mà raylib đã tạo. Vertex shader mặc
+// định của raylib dùng đúng phiên bản này, và fragment shader phải cùng
+// phiên bản thì mới link được.
+static const char *GlassShaderHeader(void)
+{
+    switch (rlGetVersion()) {
+        case RL_OPENGL_ES_20: return UI_GLASS_GLSL_100;
+        case RL_OPENGL_ES_30: return UI_GLASS_GLSL_300ES;
+        case RL_OPENGL_21:    return UI_GLASS_GLSL_120;
+        default:              return UI_GLASS_GLSL_330;
+    }
+}
+
+static Shader LoadGlassShader(const char *body)
+{
+    const char *header = GlassShaderHeader();
+    size_t headerLen = strlen(header);
+    size_t bodyLen = strlen(body);
+
+    char *code = (char *)MemAlloc((unsigned int)(headerLen + bodyLen + 1));
+    memcpy(code, header, headerLen);
+    memcpy(code + headerLen, body, bodyLen + 1);
+
+    Shader shader = LoadShaderFromMemory(NULL, code);
+    MemFree(code);
+    return shader;
+}
+
 static void CachePanelLocs(void)
 {
     Shader s = G.panelShader;
@@ -123,9 +151,9 @@ void UiGlassInit(int width, int height)
     SetTextureWrap(G.blurA.texture, TEXTURE_WRAP_CLAMP);
     SetTextureWrap(G.blurB.texture, TEXTURE_WRAP_CLAMP);
 
-    G.blurShader   = LoadShaderFromMemory(NULL, UI_GLASS_BLUR_FS);
-    G.panelShader  = LoadShaderFromMemory(NULL, UI_GLASS_PANEL_FS);
-    G.strokeShader = LoadShaderFromMemory(NULL, UI_GLASS_STROKE_FS);
+    G.blurShader   = LoadGlassShader(UI_GLASS_BLUR_FS);
+    G.panelShader  = LoadGlassShader(UI_GLASS_PANEL_FS);
+    G.strokeShader = LoadGlassShader(UI_GLASS_STROKE_FS);
 
     G.shaderReady = IsShaderValid(G.blurShader) &&
                     IsShaderValid(G.panelShader) &&

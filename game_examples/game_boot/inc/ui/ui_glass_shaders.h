@@ -7,13 +7,49 @@
 #ifndef UI_GLASS_SHADERS_H
 #define UI_GLASS_SHADERS_H
 
+// Thân shader bên dưới viết một lần, trung lập phiên bản: vào/ra qua các
+// macro VARYING, texture() và finalColor. Lúc nạp, ui_glass.c ghép thêm một
+// trong các header sau tuỳ context OpenGL mà raylib đang chạy, để cùng một
+// shader chạy được cả trên máy bàn (GL 3.3 / 2.1) lẫn GLES2 của Raspberry Pi.
+
+static const char *UI_GLASS_GLSL_330 =
+"#version 330\n"
+"#define VARYING in\n"
+"out vec4 finalColor;\n";
+
+static const char *UI_GLASS_GLSL_120 =
+"#version 120\n"
+"#define VARYING varying\n"
+"#define texture texture2D\n"
+"#define finalColor gl_FragColor\n";
+
+static const char *UI_GLASS_GLSL_300ES =
+"#version 300 es\n"
+"precision highp float;\n"
+"#define VARYING in\n"
+"out vec4 finalColor;\n";
+
+// GLES2 cần extension cho fwidth/dFdx/dFdy. GPU không có extension này thì
+// shader không biên dịch và giao diện tự lùi về đường vẽ dự phòng.
+// Toạ độ pixel cỡ 1000+ cần highp: mediump chỉ đủ sai số ~1px ở đó, mép
+// SDF sẽ răng cưa và khúc xạ bị nhoè.
+static const char *UI_GLASS_GLSL_100 =
+"#version 100\n"
+"#extension GL_OES_standard_derivatives : enable\n"
+"#ifdef GL_FRAGMENT_PRECISION_HIGH\n"
+"precision highp float;\n"
+"#else\n"
+"precision mediump float;\n"
+"#endif\n"
+"#define VARYING varying\n"
+"#define texture texture2D\n"
+"#define finalColor gl_FragColor\n";
+
 // Làm mờ Gauss tách trục: chạy một lần theo phương ngang, một lần theo dọc.
 // Dùng thủ thuật lấy mẫu tuyến tính nên chỉ cần 5 lần texture() cho kernel 9 tap.
 static const char *UI_GLASS_BLUR_FS =
-"#version 330\n"
-"in vec2 fragTexCoord;\n"
-"in vec4 fragColor;\n"
-"out vec4 finalColor;\n"
+"VARYING vec2 fragTexCoord;\n"
+"VARYING vec4 fragColor;\n"
 "uniform sampler2D texture0;\n"
 "uniform vec2 uDir;\n"
 "void main()\n"
@@ -32,10 +68,8 @@ static const char *UI_GLASS_BLUR_FS =
 // Từ SDF ta lấy được: mặt nạ khử răng cưa, vector pháp tuyến của mép, và
 // khoảng cách tới mép - ba thứ đủ để dựng khúc xạ, highlight và bóng trong.
 static const char *UI_GLASS_PANEL_FS =
-"#version 330\n"
-"in vec2 fragTexCoord;\n"
-"in vec4 fragColor;\n"
-"out vec4 finalColor;\n"
+"VARYING vec2 fragTexCoord;\n"
+"VARYING vec4 fragColor;\n"
 "uniform sampler2D texture0;\n"
 "uniform vec4 colDiffuse;\n"
 "\n"
@@ -122,7 +156,7 @@ static const char *UI_GLASS_PANEL_FS =
 "\n"
 "    // Phản sáng trên mép: mạnh nhất ở phía đối diện nguồn sáng.\n"
 "    vec2 lightDir = normalize(vec2(-0.40, -1.0));\n"
-"    float rim = smoothstep(2.2, 0.0, abs(d + 1.1));\n"
+"    float rim = 1.0 - smoothstep(0.0, 2.2, abs(d + 1.1));\n"
 "    float facing = max(dot(n, -lightDir), 0.0);\n"
 "    col += vec3(1.0) * rim * (0.14 + 0.62 * facing * facing) * uHighlight;\n"
 "\n"
@@ -136,10 +170,8 @@ static const char *UI_GLASS_PANEL_FS =
 
 // Shader phụ: vẽ viền / quầng sáng bo góc mà không cần lấy mẫu nền.
 static const char *UI_GLASS_STROKE_FS =
-"#version 330\n"
-"in vec2 fragTexCoord;\n"
-"in vec4 fragColor;\n"
-"out vec4 finalColor;\n"
+"VARYING vec2 fragTexCoord;\n"
+"VARYING vec4 fragColor;\n"
 "uniform vec4 colDiffuse;\n"
 "uniform vec2  uQuadPos;\n"
 "uniform vec2  uQuadSize;\n"
@@ -162,7 +194,7 @@ static const char *UI_GLASS_STROKE_FS =
 "{\n"
 "    vec2 p = uQuadPos + fragTexCoord * uQuadSize;\n"
 "    float d = sdRoundBox(p - uRectCenter, uRectHalf, uRadius);\n"
-    "    float aa = max(fwidth(d), 0.35);\n"
+"    float aa = max(fwidth(d), 0.35);\n"
 "    float a = 0.0;\n"
 "    if (uMode == 0)\n"
 "    {\n"
