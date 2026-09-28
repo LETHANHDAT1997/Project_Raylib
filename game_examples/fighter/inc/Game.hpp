@@ -14,6 +14,7 @@ struct MatchConfig {
     Difficulty difficulty = Difficulty::Normal;
     int  roundsToWin = 2;      // 1 / 2 / 3 -> BO1 / BO3 / BO5
     bool twoPlayers  = false;  // true: người thứ hai cầm phím, false: đánh máy
+    bool training    = false;  // luyện tập: không giới hạn giờ, hồi máu, hình nộm
     bool showHitboxes = false; // bật khung debug bằng F1
 };
 

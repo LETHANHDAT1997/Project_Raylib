@@ -1,12 +1,13 @@
 #pragma once
 #include "raylib.h"
-#include <string>
-#include <vector>
 
 namespace fighter {
 
 // ============================================================================
 // Danh sách animation mà MỌI nhân vật đều phải có. Roster nạp đúng 8 file này.
+// Các tư thế còn thiếu so với game đối kháng thật (ngồi, lùi, đỡ, đứng dậy)
+// được dựng lại từ 8 dải này: ngồi = idle nén dọc, lùi = run phát ngược,
+// đứng dậy = death phát ngược...
 // ============================================================================
 enum class AnimId {
     Idle = 0,
@@ -36,26 +37,44 @@ struct Animation {
     Rectangle FrameRect(int index) const;
 };
 
+// Cách phát: đoạn frame con, lặp hay không, xuôi hay ngược.
+struct PlayMode {
+    int  from    = 0;
+    int  to      = -1;      // -1 = tới frame cuối
+    bool loop    = true;
+    bool reverse = false;
+};
+
 // ============================================================================
 // Animator - con trỏ thời gian chạy trên một Animation.
+//
+// Hỗ trợ phát một ĐOẠN frame (đòn nhẹ chỉ dùng nửa đầu cú chém) và phát
+// NGƯỢC (lùi bước = chạy ngược, đứng dậy = ngã ngược) - hai mẹo chính để có
+// nhiều động tác từ một bộ sprite ít animation.
 // ============================================================================
 class Animator {
 public:
-    // Đổi animation. resetIfSame=false giữ nguyên tiến độ khi gọi lại cùng anim
-    // (tránh idle bị giật vì mỗi frame lại reset).
-    void Play(const Animation *anim, bool resetIfSame = false);
+    // Đổi animation. Gọi lại cùng anim + cùng chế độ thì giữ nguyên tiến độ
+    // (tránh idle bị giật vì mỗi frame lại reset), trừ khi restart = true.
+    void Play(const Animation *anim, bool restart = false);
+    void Play(const Animation *anim, const PlayMode &mode, bool restart);
     void Update(float dt);
 
     const Animation *Current() const { return anim_; }
     int   Frame()     const { return frame_; }
-    float Progress()  const;               // 0..1 trong một vòng
     bool  Finished()  const { return finished_; }
+    int   ClipLength() const;
 
-    // Tốc độ phát riêng (nhân vật nhanh/chậm khác nhau, hoặc hitstop).
+    // Tốc độ phát riêng (nhân vật nhanh/chậm khác nhau, hoặc khớp frame data).
     void  SetSpeed(float s) { speed_ = s; }
+    float Speed() const     { return speed_; }
 
 private:
+    int First() const;
+    int Last() const;
+
     const Animation *anim_ = nullptr;
+    PlayMode mode_{};
     float timer_    = 0.0f;
     int   frame_    = 0;
     bool  finished_ = false;

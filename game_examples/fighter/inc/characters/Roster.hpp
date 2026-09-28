@@ -18,6 +18,27 @@ struct CharacterStats {
     int defense = 3;
 };
 
+// Thông số dựng 9 đòn thường + đòn vật cho một nhân vật (xem Fighter::Normal).
+struct NormalProfile {
+    float  reach  = 1.0f;       // nhân chiều dài hitbox (kiếm dài, trượng dài...)
+    float  power  = 1.0f;       // nhân sát thương
+    float  speed  = 1.0f;       // nhân startup/recovery (<1 = nhanh hơn)
+    int    lightTo = 2;         // đòn nhẹ chỉ dùng Attack1 tới frame này
+    AnimId heavyAnim = AnimId::Attack2;
+    int    throwDamage = 120;
+    // Frame đầu tiên của đòn đánh mà sprite gốc đã VẼ SẴN vệt chém trắng
+    // (-1 = pack không có). Động tác không phải chém (vật, ném phi tiêu) chỉ
+    // phát tới trước frame này; đòn thường có sẵn vệt thì không vẽ chồng thêm.
+    int    slashFrom = -1;
+};
+
+// Một dòng trong bảng chiêu (hiện ở màn chọn nhân vật và menu tạm dừng).
+struct MoveListEntry {
+    std::string name;
+    std::string input;
+    std::string note;
+};
+
 // ============================================================================
 // CharacterDef - toàn bộ dữ liệu tĩnh của một nhân vật.
 //
@@ -44,6 +65,10 @@ struct CharacterDef {
     float walkSpeed    = 290.0f;
     float backSpeed    = 230.0f;
     float jumpSpeed    = 900.0f;
+    float jumpForward  = 280.0f;   // vận tốc ngang khi nhảy chéo
+    NormalProfile normals{};
+    std::vector<MoveListEntry> moveList;
+    float voicePitch   = 1.0f;     // cao độ tiếng hét (dùng chung bộ giọng)
     int   maxHealth    = 1000;
     float defenseScale = 1.0f;   // <1 = lì đòn hơn
     float meterRate    = 1.0f;

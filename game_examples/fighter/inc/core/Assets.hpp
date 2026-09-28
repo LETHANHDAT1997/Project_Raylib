@@ -19,6 +19,11 @@ public:
     // so với thư mục assets (ví dụ "characters/samurai/idle.png").
     const Texture2D &Texture(const std::string &relativePath);
 
+    // Nạp ảnh, cho phép chỉnh sửa điểm ảnh trước khi đưa lên GPU, rồi cache
+    // dưới tên `key` (ví dụ bản sprite đã làm dịu vệt chém).
+    const Texture2D &TextureProcessed(const std::string &relativePath, const std::string &key,
+                                      void (*process)(Image &, void *), void *user);
+
     // Có nạp được file này không (dùng để báo lỗi asset thiếu cho người dùng).
     bool Exists(const std::string &relativePath) const;
 

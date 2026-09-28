@@ -49,6 +49,7 @@ private:
     float enterFade_ = 0.0f;
     float sideFlash_[2] = {0.0f, 0.0f};
 
+    bool showMoves_ = false;
     Animator preview_[2];
     int previewChar_[2] = {-1, -1};
 };

@@ -6,115 +6,166 @@
 namespace fighter {
 
 // ============================================================================
-// Bốn nhân vật hiện có. Mỗi lớp chỉ khai báo frame data của 4 ô chiêu và cài
-// đặt phần "đặc sản" của mình - phần còn lại thừa kế nguyên từ Fighter.
+// Bốn nhân vật. Mỗi lớp khai báo 4 chiêu đặc biệt (mỗi chiêu 3 lực L/M/H) và
+// một siêu chiêu, cài đặt phần "đặc sản" bằng các hook của Fighter. Đòn thường,
+// đỡ, vật, combo... thừa kế nguyên từ lớp cơ sở.
 // ============================================================================
 
-// --- Mack: lãng khách cân bằng, chiêu là cú chém bay vọt lên chống nhảy ------
+// --- MACK: lãng khách kiểu "shoto" - đạn, chém xoáy, chém vọt, phản đòn ------
 class Samurai final : public Fighter {
 public:
     Samurai(const CharacterDef &def, bool facingRight) : Fighter(def, facingRight) {}
+    bool OnIncomingHit(Arena &arena, Fighter &attacker, const MoveDef &move) override;
 
 protected:
-    const MoveDef &Move(MoveSlot slot) const override;
-    void OnSpecialActivate(Arena &arena) override;
-    void OnSuperActivate(Arena &arena) override;
-    void OnHitConfirm(Arena &arena, MoveSlot slot, Vector2 point) override;
-    void DrawFront(Vector2 screenPos, float scale) const override;
+    MoveDef Special(MoveId id, Strength s) const override;
+    MoveDef SuperMove() const override;
+    bool CanUseSpecial(Arena &arena, MoveId id) const override;
+    void OnMoveActive(Arena &arena, const MoveDef &m) override;
+    void OnMoveUpdate(Arena &arena, const MoveDef &m, float t, float dt) override;
     void UpdateCharacter(Arena &arena, float dt) override;
+    void DrawFront() const override;
 
 private:
-    float slashGlow_ = 0.0f;
+    MoveDef CounterStrike() const;
+    float counterGlow_ = 0.0f;
+    float trailTimer_  = 0.0f;
+    bool  waveFired_   = false;
 };
 
-// --- Kenji: áp sát tốc độ cao, chiêu là cú lướt xuyên qua đối thủ ------------
+// --- KENJI: ninja áp sát - phi tiêu, lướt xuyên, bổ nhào, dịch chuyển --------
 class Kenji final : public Fighter {
 public:
     Kenji(const CharacterDef &def, bool facingRight) : Fighter(def, facingRight) {}
 
 protected:
-    const MoveDef &Move(MoveSlot slot) const override;
-    void OnSpecialActivate(Arena &arena) override;
-    void OnSuperActivate(Arena &arena) override;
-    void OnHitConfirm(Arena &arena, MoveSlot slot, Vector2 point) override;
+    MoveDef Special(MoveId id, Strength s) const override;
+    MoveDef SuperMove() const override;
+    bool CanUseSpecial(Arena &arena, MoveId id) const override;
+    void OnMoveStart(Arena &arena, const MoveDef &m) override;
+    void OnMoveActive(Arena &arena, const MoveDef &m) override;
+    void OnMoveUpdate(Arena &arena, const MoveDef &m, float t, float dt) override;
     void UpdateCharacter(Arena &arena, float dt) override;
-    void DrawBehind(Vector2 screenPos, float scale) const override;
+    void DrawBehind() const override;
 
 private:
-    struct Afterimage { Vector2 pos; float life; bool facingRight; int frame; };
+    struct Afterimage { Vector2 pos; float life; bool facingRight; int frame; const Animation *anim; };
+    void PushAfterimage();
     std::vector<Afterimage> trail_;
-    float dashGlow_ = 0.0f;
+    float ghostTimer_ = 0.0f;
+    float warpTimer_  = 0.0f;
+    int   warpSide_   = 1;
 };
 
-// --- Knight: chậm, trâu, đòn nặng có armor, chiêu là sóng chấn động mặt đất --
+// --- GARETH: đô vật bọc thép - húc khiên, bổ đất, chém vọt có giáp, vật lệnh -
 class Knight final : public Fighter {
 public:
     Knight(const CharacterDef &def, bool facingRight) : Fighter(def, facingRight) {}
 
 protected:
-    const MoveDef &Move(MoveSlot slot) const override;
-    void OnSpecialActivate(Arena &arena) override;
-    void OnSuperActivate(Arena &arena) override;
-    void OnHitConfirm(Arena &arena, MoveSlot slot, Vector2 point) override;
+    MoveDef Special(MoveId id, Strength s) const override;
+    MoveDef SuperMove() const override;
+    void OnMoveActive(Arena &arena, const MoveDef &m) override;
+    void OnMoveUpdate(Arena &arena, const MoveDef &m, float t, float dt) override;
+    void OnMoveLand(Arena &arena, const MoveDef &m) override;
 };
 
-// --- Wizard: giữ khoảng cách, chiêu là cầu hắc ám, chiêu cuối là ba quả đuổi -
+// --- MALTHUS: pháp sư giữ khoảng cách - cầu hắc ám, cột đất, bộc phá, dịch
+//     chuyển, siêu chiêu gọi sét ----------------------------------------------
 class Wizard final : public Fighter {
 public:
     Wizard(const CharacterDef &def, bool facingRight) : Fighter(def, facingRight) {}
 
 protected:
-    const MoveDef &Move(MoveSlot slot) const override;
-    void OnSpecialActivate(Arena &arena) override;
-    void OnSuperActivate(Arena &arena) override;
-    void OnHitConfirm(Arena &arena, MoveSlot slot, Vector2 point) override;
+    MoveDef Special(MoveId id, Strength s) const override;
+    MoveDef SuperMove() const override;
+    bool CanUseSpecial(Arena &arena, MoveId id) const override;
+    void OnMoveStart(Arena &arena, const MoveDef &m) override;
+    void OnMoveActive(Arena &arena, const MoveDef &m) override;
     void UpdateCharacter(Arena &arena, float dt) override;
-    void DrawBehind(Vector2 screenPos, float scale) const override;
+    void DrawBehind() const override;
+    void DrawFront() const override;
 
 private:
     float orbPhase_ = 0.0f;
-    float superQueue_ = 0.0f;
-    int   superShots_ = 0;
+    float burstFx_  = 0.0f;
+    int   strikesLeft_ = 0;       // siêu chiêu: số tia sét còn phải gọi
+    float strikeTimer_ = 0.0f;
 };
 
 // ============================================================================
-// Các loại đạn
+// Đạn & vùng sát thương
 // ============================================================================
 
-// Cầu năng lượng bay ngang, có đuôi và lõi sáng.
-class OrbProjectile final : public Projectile {
+// Khí kiếm hình trăng lưỡi liềm (Mack).
+class WaveProjectile final : public Projectile {
 public:
-    OrbProjectile(Vector2 pos, float dir, int ownerId, int damage, Color color, float speed);
+    WaveProjectile(Vector2 pos, float dir, int owner, int damage, float speed, Color color, float scale);
     void Update(Arena &arena, float dt) override;
     void Draw() const override;
-    void OnHit(Arena &arena, Fighter &target) override;
-
 private:
-    Color core_;
+    float scale_;
+};
+
+// Phi tiêu bốn cánh xoay tít (Kenji).
+class ShurikenProjectile final : public Projectile {
+public:
+    ShurikenProjectile(Vector2 pos, Vector2 vel, int owner, int damage, Color color);
+    void Update(Arena &arena, float dt) override;
+    void Draw() const override;
+private:
     float spin_ = 0.0f;
 };
 
-// Sóng chấn động chạy sát mặt đất, không bị chặn bởi độ cao.
+// Cầu năng lượng hắc ám (Malthus).
+class OrbProjectile final : public Projectile {
+public:
+    OrbProjectile(Vector2 pos, float dir, int owner, int damage, float speed, Color color);
+    void Update(Arena &arena, float dt) override;
+    void Draw() const override;
+private:
+    float spin_ = 0.0f;
+};
+
+// Sóng chấn động chạy dọc mặt đất (Gareth).
 class ShockwaveProjectile final : public Projectile {
 public:
-    ShockwaveProjectile(Vector2 pos, float dir, int ownerId, int damage);
+    ShockwaveProjectile(Vector2 pos, float dir, int owner, int damage, float speed, float life, float size);
     void Update(Arena &arena, float dt) override;
     void Draw() const override;
     Rectangle Box() const override;
-
+    bool Clashable() const override { return false; }
 private:
     float phase_ = 0.0f;
+    float size_  = 1.0f;
 };
 
-// Khí kiếm mỏng, bay nhanh, xoay theo hướng.
-class SlashProjectile final : public Projectile {
+// Cột hắc ám trồi lên từ mặt đất sau một nhịp báo trước (Malthus).
+class PillarHazard final : public Projectile {
 public:
-    SlashProjectile(Vector2 pos, float dir, int ownerId, int damage, Color color);
+    PillarHazard(float x, int owner, int damage, Color color, float delay);
     void Update(Arena &arena, float dt) override;
     void Draw() const override;
-
+    Rectangle Box() const override;
+    bool Harmful() const override;
+    bool Clashable() const override { return false; }
 private:
-    float spin_ = 0.0f;
+    float delay_;
+    bool  erupted_ = false;
+};
+
+// Tia sét giáng từ trời (siêu chiêu của Malthus).
+class LightningHazard final : public Projectile {
+public:
+    LightningHazard(float x, int owner, int damage, Color color, float delay);
+    void Update(Arena &arena, float dt) override;
+    void Draw() const override;
+    Rectangle Box() const override;
+    bool Harmful() const override;
+    bool Clashable() const override { return false; }
+private:
+    float delay_;
+    bool  struck_ = false;
 };
 
 } // namespace fighter

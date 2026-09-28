@@ -2,6 +2,7 @@
 #include "Game.hpp"
 #include "characters/Roster.hpp"
 #include "core/Config.hpp"
+#include "core/Audio.hpp"
 #include "core/Text.hpp"
 #include "scenes/SelectScene.hpp"
 #include <cmath>
@@ -9,13 +10,14 @@
 namespace fighter {
 
 namespace {
-const char *kMenu[] = {"1 NGƯỜI  ·  ĐẤU MÁY", "2 NGƯỜI  ·  ĐẤU NHAU", "THOÁT"};
-constexpr int kMenuCount = 3;
+const char *kMenu[] = {"1 NGƯỜI  ·  ĐẤU MÁY", "2 NGƯỜI  ·  ĐẤU NHAU", "LUYỆN TẬP", "THOÁT"};
+constexpr int kMenuCount = 4;
 } // namespace
 
 void TitleScene::OnEnter(Game &game)
 {
     (void)game;
+    Audio::Instance().PlayMusic(MusicTrack::Menu);
     Roster &roster = Roster::Instance();
     for (int i = 0; i < 4; ++i) {
         const int idx = i % std::max(1, roster.Count());
@@ -29,17 +31,20 @@ void TitleScene::Update(Game &game, float dt)
     blink_ += dt;
     for (auto &a : demo_) a.Update(dt);
 
-    if (IsKeyPressed(KEY_DOWN) || IsKeyPressed(KEY_S)) cursor_ = (cursor_ + 1) % kMenuCount;
-    if (IsKeyPressed(KEY_UP)   || IsKeyPressed(KEY_W)) cursor_ = (cursor_ + kMenuCount - 1) % kMenuCount;
+    Audio &au = Audio::Instance();
+    if (IsKeyPressed(KEY_DOWN) || IsKeyPressed(KEY_S)) { cursor_ = (cursor_ + 1) % kMenuCount; au.Play(Sfx::UiMove); }
+    if (IsKeyPressed(KEY_UP)   || IsKeyPressed(KEY_W)) { cursor_ = (cursor_ + kMenuCount - 1) % kMenuCount; au.Play(Sfx::UiMove); }
 
     if (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE) || IsKeyPressed(KEY_KP_ENTER)) {
+        au.Play(Sfx::UiConfirm);
+        MatchConfig &cfg = game.Config();
         switch (cursor_) {
             case 0:
-                game.Config().twoPlayers = false;
-                game.ChangeScene(std::unique_ptr<Scene>(new SelectScene()));
-                break;
             case 1:
-                game.Config().twoPlayers = true;
+            case 2:
+                cfg.twoPlayers = cursor_ == 1;
+                cfg.training   = cursor_ == 2;
+                au.Say(Line::ChooseCharacter, 0.2f);
                 game.ChangeScene(std::unique_ptr<Scene>(new SelectScene()));
                 break;
             default:
@@ -52,7 +57,7 @@ void TitleScene::Update(Game &game, float dt)
 void TitleScene::DrawMenu() const
 {
     const float cx = kCanvasWidth * 0.5f;
-    float y = 452.0f;
+    float y = 430.0f;
 
     for (int i = 0; i < kMenuCount; ++i) {
         const bool sel = (i == cursor_);
@@ -70,7 +75,7 @@ void TitleScene::DrawMenu() const
         DrawTextBoldCentered(kMenu[i], cx + 2.0f, y + 2.0f, size, Color{0, 0, 0, 160});
         DrawTextBoldCentered(kMenu[i], cx, y, size,
                              sel ? Color{255, 232, 170, 255} : Color{190, 184, 176, 230});
-        y += size + 30.0f;
+        y += size + 24.0f;
     }
 }
 
@@ -117,7 +122,7 @@ void TitleScene::Draw(Game &game)
     DrawTextBoldCentered("ĐẤU SĨ", cx, 166.0f + bob, 104.0f, Color{255, 190, 72, 255});
     DrawTextBoldCentered("ĐẤU SĨ", cx, 162.0f + bob, 104.0f, Color{255, 236, 170, 90});
 
-    DrawTextCentered("Đối kháng 2D · 4 nhân vật · 4 mức độ khó",
+    DrawTextCentered("Đối kháng 2D · 4 nhân vật · 20 chiêu đặc biệt · 4 mức độ khó",
                      cx, 292.0f, 22.0f, Color{200, 196, 190, 220});
 
     // Dải tối phía sau menu để chữ không chìm vào rừng cây.
@@ -127,7 +132,7 @@ void TitleScene::Draw(Game &game)
 
     DrawMenu();
 
-    DrawTextCentered("↑ ↓ chọn  ·  Enter xác nhận  ·  F11 toàn màn hình",
+    DrawTextCentered("↑ ↓ chọn  ·  Enter xác nhận  ·  Trong trận: WASD hoặc mũi tên để di chuyển  ·  F11 toàn màn hình",
                      cx, kCanvasHeight - 52.0f, 17.0f, Color{160, 156, 150, 200});
 }
 

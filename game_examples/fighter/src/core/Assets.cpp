@@ -79,6 +79,24 @@ const Texture2D &Assets::Texture(const std::string &relativePath)
     return res.first->second;
 }
 
+const Texture2D &Assets::TextureProcessed(const std::string &relativePath, const std::string &key,
+                                          void (*process)(Image &, void *), void *user)
+{
+    auto it = cache_.find(key);
+    if (it != cache_.end()) return it->second;
+
+    const std::string full = root_ + relativePath;
+    if (!FileExists(full)) return Texture(relativePath);   // đi đường báo thiếu file
+
+    Image img = LoadImage(full.c_str());
+    ImageFormat(&img, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
+    if (process) process(img, user);
+    Texture2D tex = LoadTextureFromImage(img);
+    UnloadImage(img);
+    SetTextureFilter(tex, TEXTURE_FILTER_POINT);
+    return cache_.emplace(key, tex).first->second;
+}
+
 void Assets::UnloadAll()
 {
     for (auto &kv : cache_) UnloadTexture(kv.second);

@@ -14,21 +14,49 @@ Toàn bộ hình hoạ là **sprite pixel-art có sẵn, giấy phép CC0** (xem
 
 ## Điều khiển
 
+**Chơi 1 người / luyện tập** — dùng bộ nào cũng được:
+
+| | Bộ WASD | Bộ mũi tên |
+|---|---|---|
+| Đi / nhảy / ngồi | `A` `D` / `W` / `S` | `←` `→` / `↑` / `↓` |
+| Đòn nhẹ · vừa · mạnh | `J` `K` `L` | `Z` `X` `C` |
+| Chiêu nhanh (Special) | `I` | `V` |
+| Siêu chiêu | `U` | `B` |
+| Đỡ đòn | **giữ hướng lùi** (`Shift` trái) | **giữ hướng lùi** (`Shift` phải) |
+
+**Chơi 2 người** — người 1 chỉ dùng bộ WASD, mũi tên thuộc về người 2:
+
 | | Người 1 | Người 2 |
 |---|---|---|
-| Di chuyển | `A` `D` | `←` `→` |
-| Nhảy | `W` | `↑` |
-| Ngồi | `S` | `↓` |
-| Đỡ đòn | `Shift` (hoặc giữ lùi + `S`) | `Numpad 0` |
-| Đòn nhanh | `J` | `Numpad 1` |
-| Đòn mạnh | `K` | `Numpad 2` |
-| Chiêu riêng | `L` | `Numpad 3` |
-| Chiêu cuối | `U` | `Numpad 5` |
+| Đi / nhảy / ngồi | `A` `D` / `W` / `S` | `←` `→` / `↑` / `↓` |
+| Đòn nhẹ · vừa · mạnh | `J` `K` `L` | `Num1` `Num2` `Num3` |
+| Chiêu nhanh · Siêu chiêu | `I` · `U` | `Num4` · `Num5` |
+| Đỡ đòn | giữ lùi (`Shift`) | giữ lùi (`Num0`) |
 
-`P` hoặc `Esc` tạm dừng · `F1` bật khung va chạm (debug) · `F11` toàn màn hình.
+`P`/`Esc` tạm dừng (có **bảng chiêu**) · `F1` khung va chạm · `F11` toàn màn hình.
 
-Chiêu cuối chỉ tung được khi thanh Super (thanh xanh dưới tên) đã đầy. Thanh này
-dâng lên khi bạn đánh trúng, đỡ đòn hoặc ăn đòn.
+### Hệ thống chiến đấu (theo Street Fighter)
+
+| Thao tác | Cách bấm |
+|---|---|
+| Đỡ đứng / đỡ ngồi | Giữ `←` chặn đòn giữa + đòn trên (đòn nhảy); giữ `↙` chặn đòn giữa + đòn thấp (quét chân) |
+| Đòn ngồi / đòn nhảy | `↓` + đòn / đang nhảy + đòn (đòn nhảy là **đòn trên**, phải đứng đỡ) |
+| Nối đòn (chain) | `J → K → L` khi đang trúng / bị đỡ |
+| Hủy đòn (cancel) | Đòn thường trúng → lệnh chiêu đặc biệt → `U` siêu chiêu |
+| Vật / phá vật | `J + K` cùng lúc sát người; bị vật thì bấm `J + K` kịp để phá |
+| Lướt | `→ →` / `← ←` (lướt lùi có vài frame bất tử) |
+| Chiêu đặc biệt | `↓↘→`, `↓↙←`, `→↓↘`, `↓ ↓` + đòn — lực L/M/H đổi tốc độ, tầm xa |
+| Chiêu nhanh | `I`, `→+I`, `↓+I`, `←+I` (cho người chưa quen quay tay) |
+| Siêu chiêu | `U` hoặc `↓↘→↓↘→` + đòn — tốn 1 trong 2 thanh Super, đứng hình + cut-in |
+
+Ngoài ra: counter hit (đánh trúng lúc đối thủ đang vung đòn), giảm sát thương
+theo độ dài combo, chip damage khi đỡ chiêu đặc biệt, tung hứng có giới hạn,
+ngã–đứng dậy bất tử, hai quả đạn va nhau thì triệt tiêu, camera bám theo trên
+sàn rộng gấp gần 2 lần màn hình, dồn góc tường.
+
+Nhân vật luôn **quay mặt về phía đối thủ**; đi lùi phát animation chạy ngược
+nên chân bước lùi khớp với hướng di chuyển. Nhảy qua đầu đối thủ thì tới lúc
+chạm đất mới quay lại.
 
 ---
 
@@ -37,12 +65,12 @@ dâng lên khi bạn đánh trúng, đỡ đòn hoặc ăn đòn.
 ```
 Game ──► Scene (ảo)
            ├─ TitleScene     màn tiêu đề
-           ├─ SelectScene    chọn nhân vật + độ khó   ← "màn Settings"
-           └─ BattleScene    luật trận: hiệp, đồng hồ, K.O., tạm dừng
+           ├─ SelectScene    chọn nhân vật + độ khó + chế độ + bảng chiêu  ← "màn Settings"
+           └─ BattleScene    luật trận, âm thanh, cut-in siêu chiêu, luyện tập
                   │
                   ├─ Arena            thế giới trận đấu: va chạm, đạn, hiệu ứng
                   │     ├─ Fighter (ảo) ──► Samurai · Kenji · Knight · Wizard
-                  │     ├─ Projectile (ảo) ──► OrbProjectile · ShockwaveProjectile · SlashProjectile
+                  │     ├─ Projectile (ảo) ──► Wave · Shuriken · Orb · Shockwave · Pillar · Lightning
                   │     └─ ParticleSystem
                   └─ Hud              thanh máu, thanh Super, đồng hồ, combo
 ```
@@ -59,17 +87,25 @@ xoá đối tượng đang chạy dở.
 
 | Hàm ảo | Vai trò |
 |---|---|
-| `Move(MoveSlot)` | **bắt buộc** — frame data của 4 ô chiêu |
-| `OnSpecialActivate(Arena&)` | chạy đúng lúc hitbox chiêu riêng bật lên |
-| `OnSuperActivate(Arena&)` | tương tự cho chiêu cuối |
-| `OnHitConfirm(...)` | hiệu ứng khi đòn chạm đối thủ |
-| `UpdateCharacter(...)` | bộ đếm/hào quang riêng mỗi frame |
-| `DrawBehind` / `DrawFront` | vẽ thêm lớp sau/trước sprite |
+| `Special(MoveId, Strength)` | **bắt buộc** — frame data 4 chiêu đặc biệt × 3 lực |
+| `SuperMove()` | **bắt buộc** — siêu chiêu |
+| `Normal(MoveId)` | đòn thường; mặc định dựng từ `NormalProfile` |
+| `CanUseSpecial` | ví dụ: mỗi lúc chỉ một quả đạn |
+| `OnMoveStart / OnMoveActive / OnMoveUpdate / OnMoveLand` | bắn đạn, dịch chuyển, xoay... |
+| `OnMoveHit` / `OnIncomingHit` | khi trúng đòn / thế phản đòn |
+| `UpdateCharacter`, `DrawBehind`, `DrawFront` | hào quang, bóng mờ riêng |
 
 **`MoveDef`** — một đòn đánh được mô tả bằng dữ liệu chứ không phải câu lệnh:
 `startup` (vung tay) → `active` (hitbox bật) → `recovery` (thu đòn), kèm hitbox,
-sát thương, lực đẩy, số lần trúng, có armor hay không. Cân bằng lại một nhân vật
-là sửa vài con số, không phải sửa logic.
+độ cao (giữa / thấp / trên / vật), quyền hủy đòn, vận tốc lao/vọt, khoảng bất
+tử, giáp, hiệu ứng vệt chém. Cân bằng lại một nhân vật là sửa vài con số.
+
+**Sự kiện** — `Arena` không phát âm thanh; nó đẩy `GameEvent` (trúng, đỡ, vật,
+counter, K.O....) vào hàng đợi, `BattleScene` đọc ra để phát tiếng và hiện chữ.
+
+**Tái dụng sprite** — pack CC0 chỉ có 8 animation, các tư thế còn thiếu được
+dựng lại: ngồi = idle nén dọc 72%, đi lùi = chạy phát ngược, đứng dậy = ngã
+phát ngược, đòn nhẹ = nửa đầu đòn chém, lộn nhào = xoay sprite.
 
 **`Controller`** — người thật (`HumanController`) và máy (`AIController`) đều chỉ
 sinh ra một `InputState`. `Fighter` không bao giờ gọi `IsKeyDown` trực tiếp, nên
@@ -77,18 +113,23 @@ cả hai đi chung một đường xử lý — máy không thể "gian lận" b
 
 ---
 
-## Bốn nhân vật
+## Bốn nhân vật — 20 chiêu đặc biệt
 
-| Nhân vật | Lối đánh | Chiêu riêng (`L`) | Chiêu cuối (`U`) |
-|---|---|---|---|
-| **MACK** | cân bằng, dễ chơi | Thăng Long Trảm — vọt lên, hất tung, trị người hay nhảy | Tam Liên Trảm — lao tới, 3 nhát + khí kiếm |
-| **KENJI** | nhanh nhất, máu mỏng | Ảnh Bộ — lướt xuyên qua đối thủ, để lại bóng mờ | Loạn Ảnh Kiếm — 5 nhát liên hoàn |
-| **GARETH** | chậm, trâu, đòn nặng có armor | Khiên Xung — húc thẳng, ăn đòn vẫn đi tiếp | Địa Chấn — sóng chạy dọc mặt sàn |
-| **MALTHUS** | giữ khoảng cách, bắn từ xa | Hắc Cầu — quả cầu năng lượng | Tam Hắc Cầu — 3 quả bay so le |
+| Nhân vật | `↓↘→` | `↓↙←` | `→↓↘` | `↓ ↓` | Siêu chiêu |
+|---|---|---|---|---|---|
+| **MACK** — cân bằng | Kiếm Khí (đạn) | Toàn Phong Trảm (xoáy) | Thăng Long Trảm (chém vọt, bất tử) | Phản Kiếm (thế phản đòn) | Tam Liên Trảm |
+| **KENJI** — áp sát | Phi Tiêu (H: 3 chiếc) | Ảnh Bộ (lướt xuyên) | Ưng Trảo (bổ nhào, đòn trên) | Thế Thân (dịch chuyển) | Loạn Ảnh Kiếm (7 hit) |
+| **GARETH** — đô vật | Khiên Xung (có giáp) | Trảm Địa (bổ + chấn động) | Nộ Kích (chém vọt có giáp) | Địa Ngục Quăng (vật lệnh) | Địa Chấn (sóng đất) |
+| **MALTHUS** — giữ khoảng cách | Hắc Cầu | Hắc Trụ (cột ở xa) | Hắc Bạo (bộc phá) | Dịch Chuyển | Thiên Phạt (5 tia sét) |
 
-Độ khó (Dễ / Thường / Khó / Siêu khó) điều chỉnh thời gian phản ứng, độ lì, khả
-năng đỡ đòn, khả năng nối combo và sức chịu đòn của máy — toàn bộ nằm trong một
-bảng ở `src/core/Difficulty.cpp`.
+Mỗi nhân vật còn 9 đòn thường (đứng/ngồi/nhảy × nhẹ/vừa/mạnh) và đòn vật.
+
+**Chế độ:** 1 người đấu máy (4 độ khó), 2 người, và **Luyện tập** (hình nộm
+đứng / ngồi / tự đỡ / nhảy, máu và Super hồi đầy, `R` đặt lại vị trí).
+
+**Âm thanh:** xướng ngôn (ROUND 1, FIGHT, YOU WIN...), tiếng va chạm theo
+lực đòn, tiếng hét khi tung chiêu / trúng đòn / gục ngã, nhạc nền. Tiếng gió
+vung đòn, phép thuật, sét được tổng hợp bằng code trong `core/Audio.cpp`.
 
 ---
 
@@ -109,25 +150,29 @@ frame được suy ra từ kích thước ảnh nên không phải khai báo.
 Nguồn miễn phí hợp lệ: các pack CC0 của [LuizMelo](https://luizmelo.itch.io/)
 (Martial Hero, Hero Knight, Evil Wizard, Huntress...) — đúng bố cục này.
 
-**2. Viết lớp con.** Trong `inc/characters/Characters.hpp` và `.cpp`:
+**2. Viết lớp con.** Khai báo trong `inc/characters/Characters.hpp`, cài đặt
+trong một file mới `src/characters/<Tên>.cpp` (xem `Samurai.cpp` làm mẫu):
 
 ```cpp
 class Monk final : public Fighter {
 public:
     Monk(const CharacterDef &def, bool facingRight) : Fighter(def, facingRight) {}
 protected:
-    const MoveDef &Move(MoveSlot slot) const override;   // bắt buộc
-    void OnSpecialActivate(Arena &arena) override;       // tuỳ chọn
+    MoveDef Special(MoveId id, Strength s) const override;   // bắt buộc
+    MoveDef SuperMove() const override;                      // bắt buộc
+    void OnMoveActive(Arena &arena, const MoveDef &m) override;  // tuỳ chọn
 };
 ```
 
 **3. Khai báo vào roster.** Thêm một khối `Add({...})` trong `Roster::Load()`
-(`src/characters/Roster.cpp`) — có sẵn 4 ví dụ để copy.
+(`src/characters/Roster.cpp`), kèm `moveList` để bảng chiêu hiển thị — có sẵn 4
+ví dụ để copy.
 
 Hai giá trị duy nhất phải canh bằng mắt khi dùng pack mới:
 
 * `anchor` — toạ độ *trong frame gốc* ứng với điểm giữa hai bàn chân
-* `scale` — phóng to bao nhiêu lần để nhân vật cao khoảng 190 px trên màn hình
+* `scale` — phóng to bao nhiêu lần để nhân vật cao khoảng 190 px (toạ độ thế giới)
+* `normals.slashFrom` — frame đầu tiên có vệt chém vẽ sẵn trong sprite (-1 nếu không)
 
 Mẹo: bật `F1` trong trận để thấy khung va chạm, chỉnh `anchor` cho tới khi sprite
 đứng khớp với hurtbox.

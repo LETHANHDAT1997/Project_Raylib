@@ -2,7 +2,9 @@
 #include "Game.hpp"
 #include "characters/Roster.hpp"
 #include "core/Config.hpp"
+#include "core/Audio.hpp"
 #include "core/Text.hpp"
+#include "render/MoveList.hpp"
 #include "scenes/BattleScene.hpp"
 #include "scenes/TitleScene.hpp"
 #include <algorithm>
@@ -105,8 +107,8 @@ void SelectScene::UpdateGridInput(Game &game)
     const bool left  = IsKeyPressed(KEY_LEFT)  || IsKeyPressed(KEY_A);
     const bool right = IsKeyPressed(KEY_RIGHT) || IsKeyPressed(KEY_D);
 
-    if (left)  { cur = (cur - 1 + n) % n; page_ = PageOfIndex(cur); sideFlash_[activeSide_] = 0.25f; }
-    if (right) { cur = (cur + 1) % n;     page_ = PageOfIndex(cur); sideFlash_[activeSide_] = 0.25f; }
+    if (left)  { cur = (cur - 1 + n) % n; page_ = PageOfIndex(cur); sideFlash_[activeSide_] = 0.25f; Audio::Instance().Play(Sfx::UiMove); }
+    if (right) { cur = (cur + 1) % n;     page_ = PageOfIndex(cur); sideFlash_[activeSide_] = 0.25f; Audio::Instance().Play(Sfx::UiMove); }
 
     // Nhảy nguyên trang khi roster dài.
     if (IsKeyPressed(KEY_Q) && PageCount() > 1) {
@@ -124,6 +126,7 @@ void SelectScene::UpdateGridInput(Game &game)
     }
 
     if (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE) || IsKeyPressed(KEY_KP_ENTER)) {
+        Audio::Instance().Play(Sfx::UiConfirm);
         locked_[activeSide_] = true;
         sideFlash_[activeSide_] = 0.5f;
         if (!locked_[1 - activeSide_]) {
@@ -143,10 +146,11 @@ void SelectScene::UpdateOptionInput(Game &game)
     MatchConfig &cfg = game.Config();
     const int dir = (IsKeyPressed(KEY_RIGHT) || IsKeyPressed(KEY_D)) ? 1
                   : (IsKeyPressed(KEY_LEFT)  || IsKeyPressed(KEY_A)) ? -1 : 0;
+    if (dir != 0) Audio::Instance().Play(Sfx::UiMove);
 
     switch (row_) {
         case Row::Difficulty:
-            if (dir != 0 && !cfg.twoPlayers) {
+            if (dir != 0 && !cfg.twoPlayers && !cfg.training) {
                 int d = (int)cfg.difficulty + dir;
                 const int count = (int)Difficulty::Count;
                 cfg.difficulty = (Difficulty)((d + count) % count);
@@ -160,11 +164,18 @@ void SelectScene::UpdateOptionInput(Game &game)
             break;
 
         case Row::Mode:
-            if (dir != 0) cfg.twoPlayers = !cfg.twoPlayers;
+            // Xoay vòng: 1 người -> 2 người -> luyện tập
+            if (dir != 0) {
+                int mode = cfg.training ? 2 : (cfg.twoPlayers ? 1 : 0);
+                mode = (mode + dir + 3) % 3;
+                cfg.twoPlayers = mode == 1;
+                cfg.training   = mode == 2;
+            }
             break;
 
         case Row::Start:
             if (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE) || IsKeyPressed(KEY_KP_ENTER)) {
+                Audio::Instance().Play(Sfx::UiConfirm);
                 CommitStart(game);
             }
             break;
@@ -187,6 +198,28 @@ void SelectScene::Update(Game &game, float dt)
     enterFade_ = std::min(1.0f, enterFade_ + dt * 3.2f);
     for (float &f : sideFlash_) f = std::max(0.0f, f - dt);
 
+    // Bảng chiêu đang mở: chỉ đổi nhân vật hoặc đóng lại.
+    if (showMoves_) {
+        Roster &roster = Roster::Instance();
+        const int n = roster.Count();
+        int &cur = cursor_[activeSide_];
+        if (IsKeyPressed(KEY_LEFT)  || IsKeyPressed(KEY_A)) { cur = (cur - 1 + n) % n; Audio::Instance().Play(Sfx::UiMove); }
+        if (IsKeyPressed(KEY_RIGHT) || IsKeyPressed(KEY_D)) { cur = (cur + 1) % n;     Audio::Instance().Play(Sfx::UiMove); }
+        page_ = PageOfIndex(cur);
+        if (IsKeyPressed(KEY_M) || IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_BACKSPACE)) {
+            showMoves_ = false;
+            Audio::Instance().Play(Sfx::UiBack);
+        }
+        game.Config().p1Character = cursor_[0];
+        game.Config().p2Character = cursor_[1];
+        return;
+    }
+    if (IsKeyPressed(KEY_M)) {
+        showMoves_ = true;
+        Audio::Instance().Play(Sfx::UiConfirm);
+        return;
+    }
+
     // Đổi hàng đang điều khiển
     const int rowCount = (int)Row::Count;
     if (IsKeyPressed(KEY_DOWN) || IsKeyPressed(KEY_S)) {
@@ -201,6 +234,7 @@ void SelectScene::Update(Game &game, float dt)
 
     // Quay lui: mở khoá lần chọn gần nhất, hết thì về màn tiêu đề.
     if (IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_BACKSPACE)) {
+        Audio::Instance().Play(Sfx::UiBack);
         if (locked_[1])      { locked_[1] = false; activeSide_ = 1; row_ = Row::Grid; }
         else if (locked_[0]) { locked_[0] = false; activeSide_ = 0; row_ = Row::Grid; }
         else                 game.ChangeScene(std::unique_ptr<Scene>(new TitleScene()));
@@ -260,7 +294,7 @@ void SelectScene::DrawPortrait(Game &game, bool leftSide) const
     }
 
     // --- nhãn 1P / 2P / CPU ------------------------------------------------
-    const char *tag = leftSide ? "1P" : (game.Config().twoPlayers ? "2P" : "CPU");
+    const char *tag = leftSide ? "1P" : (game.Config().training ? "NỘM" : game.Config().twoPlayers ? "2P" : "CPU");
     DrawRectangleRounded(Rectangle{panel.x + 10, panel.y + 10, 54, 24}, 0.4f, 8, def.accentDeep);
     DrawTextBoldCentered(tag, panel.x + 37, panel.y + 14, 16.0f, Color{255, 255, 255, 235});
 
@@ -317,12 +351,18 @@ void SelectScene::DrawPortrait(Game &game, bool leftSide) const
     DrawLine((int)sx, (int)ky - 8, (int)(sx + sw), (int)ky - 8, Color{60, 58, 72, 220});
 
     char line[128];
-    std::snprintf(line, sizeof(line), "L  %s", def.specialName.c_str());
-    DrawText(line, Vector2{sx, ky}, 14.0f, Color{196, 192, 188, 235});
-    std::snprintf(line, sizeof(line), "U  %s", def.superName.c_str());
-    DrawText(line, Vector2{sx, ky + 20.0f}, 14.0f, Color{196, 192, 188, 235});
-    DrawText("(chiêu cuối · cần đầy thanh Super)", Vector2{sx, ky + 40.0f}, 12.0f,
-             Color{128, 126, 132, 210});
+    // Hai chiêu tiêu biểu (chiêu đầu + siêu chiêu); bảng đủ xem bằng phím M.
+    if (def.moveList.size() >= 2) {
+        const MoveListEntry &a = def.moveList.front();
+        const MoveListEntry &b = def.moveList.back();
+        std::snprintf(line, sizeof(line), "%s", a.name.c_str());
+        DrawText(line, Vector2{sx, ky}, 14.0f, Color{196, 192, 188, 235});
+        DrawText(a.input.c_str(), Vector2{sx + sw - TextWidth(a.input.c_str(), 14.0f), ky}, 14.0f, Color{255, 214, 120, 235});
+        std::snprintf(line, sizeof(line), "%s", b.name.c_str());
+        DrawText(line, Vector2{sx, ky + 20.0f}, 14.0f, def.accent);
+        DrawText(b.input.c_str(), Vector2{sx + sw - TextWidth(b.input.c_str(), 14.0f), ky + 20.0f}, 14.0f, Color{255, 214, 120, 235});
+    }
+    DrawText("M: xem đủ bảng chiêu", Vector2{sx, ky + 40.0f}, 12.0f, Color{128, 126, 132, 210});
 }
 
 void SelectScene::DrawGrid(Game &game) const
@@ -380,7 +420,7 @@ void SelectScene::DrawGrid(Game &game) const
         if (cursor_[1] == index) {
             DrawRectangleRounded(Rectangle{r.x + r.width - 40, r.y + 10, 34, 21}, 0.4f, 6,
                                  Color{120, 200, 255, 240});
-            DrawTextBoldCentered(game.Config().twoPlayers ? "2P" : "CPU",
+            DrawTextBoldCentered(game.Config().training ? "NỘM" : game.Config().twoPlayers ? "2P" : "CPU",
                                  r.x + r.width - 23, r.y + 13, 12.0f, Color{10, 20, 30, 255});
         }
 
@@ -436,13 +476,15 @@ void SelectScene::DrawOptions(Game &game) const
     struct RowInfo { Row row; const char *label; std::string value; std::string note; bool enabled; };
     const RowInfo rows[] = {
         {Row::Difficulty, "ĐỘ KHÓ", dp.name,
+         cfg.training ? std::string("Luyện tập không dùng máy") :
          cfg.twoPlayers ? std::string("Chế độ 2 người không dùng máy") : std::string(dp.note),
-         !cfg.twoPlayers},
+         !cfg.twoPlayers && !cfg.training},
         {Row::Rounds, "SỐ HIỆP", roundsBuf,
          "Bên nào thắng đủ số hiệp trước thì thắng cả trận", true},
-        {Row::Mode, "CHẾ ĐỘ", cfg.twoPlayers ? "2 NGƯỜI" : "1 NGƯỜI",
-         cfg.twoPlayers ? "Người 2 dùng phím mũi tên và numpad"
-                        : "Máy điều khiển đối thủ theo độ khó đã chọn", true},
+        {Row::Mode, "CHẾ ĐỘ", cfg.training ? "LUYỆN TẬP" : cfg.twoPlayers ? "2 NGƯỜI" : "1 NGƯỜI",
+         cfg.training ? "Hình nộm đứng yên, máu hồi đầy, không giới hạn giờ" :
+         cfg.twoPlayers ? "Người 1: WASD + J K L · Người 2: mũi tên + numpad"
+                        : "Bạn dùng WASD + J K L, hoặc mũi tên + Z X C", true},
     };
 
     float y = panel.y + 14.0f;
@@ -498,7 +540,7 @@ void SelectScene::DrawFooter(Game &game) const
     (void)game;
     const char *hint =
         "↑↓ đổi mục  ·  ←→ đổi lựa chọn  ·  Tab đổi bên  ·  Enter xác nhận  ·  "
-        "F vào trận ngay  ·  Esc quay lại";
+        "M bảng chiêu  ·  F vào trận ngay  ·  Esc quay lại";
     DrawTextCentered(hint, kCanvasWidth * 0.5f, kCanvasHeight - 30.0f, 15.0f,
                      Color{156, 152, 150, 210});
 }
@@ -519,6 +561,13 @@ void SelectScene::Draw(Game &game)
     DrawGrid(game);
     DrawOptions(game);
     DrawFooter(game);
+
+    if (showMoves_) {
+        DrawRectangle(0, 0, kCanvasWidth, kCanvasHeight, Color{0, 0, 0, 170});
+        DrawMoveList(Roster::Instance().At(cursor_[activeSide_]), Rectangle{190, 70, 900, 560}, time_);
+        DrawTextCentered("← → đổi nhân vật  ·  M / Esc đóng", kCanvasWidth * 0.5f, 650, 16,
+                         Color{190, 186, 180, 220});
+    }
 
     // Mờ dần khi vừa vào màn.
     if (enterFade_ < 1.0f) {

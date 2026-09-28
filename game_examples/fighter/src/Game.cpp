@@ -1,6 +1,7 @@
 #include "Game.hpp"
 #include "characters/Roster.hpp"
 #include "core/Assets.hpp"
+#include "core/Audio.hpp"
 #include "core/Text.hpp"
 #include "scenes/TitleScene.hpp"
 #include <utility>
@@ -20,6 +21,7 @@ void Game::Init()
     initialized_ = true;
 
     TextInit();
+    Audio::Instance().Init();
     Roster::Instance().Load();
     background_.Load();
 
@@ -44,6 +46,7 @@ void Game::ApplyPendingScene()
 void Game::Update(float dt)
 {
     if (!initialized_) Init();
+    Audio::Instance().Update(dt);
     if (scene_) scene_->Update(*this, dt);
     // Đổi scene ở cuối frame: nếu xoá ngay giữa Update thì đang đứng trên
     // chính đối tượng vừa bị huỷ.
@@ -65,6 +68,7 @@ void Game::Shutdown()
     scene_.reset();
     pending_.reset();
     Roster::Instance().Unload();
+    Audio::Instance().Shutdown();
     Assets::Instance().UnloadAll();
     TextShutdown();
 }

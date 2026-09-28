@@ -4,7 +4,7 @@
 
 namespace fighter {
 
-enum class ParticleKind { Spark, Dust, Energy, Shard, Ring };
+enum class ParticleKind { Spark, Dust, Energy, Shard, Ring, Flash, Smoke, Bolt };
 
 struct Particle {
     Vector2 pos{}, vel{};
@@ -16,8 +16,8 @@ struct Particle {
 };
 
 // ============================================================================
-// ParticleSystem - hiệu ứng va chạm, bụi chân, năng lượng. Tách riêng khỏi
-// Fighter để mọi thực thể (đòn đánh, đạn, HUD) đều bắn được hiệu ứng.
+// ParticleSystem - hiệu ứng va chạm, bụi, năng lượng, khói. Tách khỏi Fighter
+// để mọi thực thể (đòn, đạn, HUD) đều bắn được hiệu ứng.
 // ============================================================================
 class ParticleSystem {
 public:
@@ -29,9 +29,13 @@ public:
     void Dust(Vector2 at, int count, float dir);
     void Ring(Vector2 at, Color color, float radius);
     void Trail(Vector2 at, Color color, float size);
+    void Spark(Vector2 at, Color color, float power);   // tia sáng hình sao lúc trúng đòn
+    void Smoke(Vector2 at, int count, Color color);
+    void Bolt(Vector2 from, Vector2 to, Color color);   // tia sét zig-zag
 
 private:
     Particle *Spawn();
+    void DrawOne(const Particle &p) const;
     std::vector<Particle> pool_;
 };
 

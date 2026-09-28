@@ -95,20 +95,20 @@ static const GameEntry s_games[] = {
         .id = "fighter",
         .title = "Đấu Sĩ",
         .platform = "PC · Raylib",
-        .tagline = "Đối kháng 2D với sprite pixel-art: 4 đấu sĩ, mỗi người một bộ chiêu, "
-                   "chọn độ khó rồi so găng ba hiệp.",
+        .tagline = "Đối kháng kiểu Street Fighter: lệnh quay tay, combo hủy đòn, "
+                   "20 chiêu đặc biệt, siêu chiêu và chế độ luyện tập.",
         .developer = "Raylib Arcade",
         .releaseDate = "Bản dựng 2026",
         .engine = "Raylib 6.x · C++17",
-        .tags = {"Đối kháng", "Combo", "2 người", "Chọn nhân vật"},
+        .tags = {"Đối kháng", "Combo", "2 người", "Luyện tập"},
         .tagCount = 4,
         .controls = {
-            "A D  Di chuyển · W  Nhảy",
-            "Shift  Đỡ đòn · S  Ngồi",
-            "J  Đòn nhanh · K  Đòn mạnh",
-            "L  Chiêu riêng · U  Chiêu cuối",
-            "P  Tạm dừng · F1  Khung va chạm",
-            "Người 2: mũi tên + Numpad 1/2/3/5/0"
+            "WASD hoặc mũi tên  Đi · nhảy · ngồi",
+            "Giữ lùi  Đỡ đòn (↙ đỡ thấp)",
+            "J K L (hoặc Z X C)  Nhẹ · vừa · mạnh",
+            "↓↘→ / →↓↘ / ↓↙← + đòn  Chiêu",
+            "I  Chiêu nhanh · U  Siêu chiêu",
+            "J+K  Vật · P  Tạm dừng / bảng chiêu"
         },
         .controlCount = 6,
         .canvasWidth = 1280,
