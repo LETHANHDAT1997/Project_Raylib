@@ -4,6 +4,7 @@
 #include "boot_stats.h"
 #include "boot_settings.h"
 #include "boot_input.h"
+#include "boot_perf.h"
 #include "game_registry.h"
 #include "save_data.h"
 
@@ -143,6 +144,8 @@ void BootAppUpdate(BootApp *app, float dt)
     if (app->transition.active) return;
 
     if (app->state == BOOT_STATE_HUB) {
+        // Chỉ đo khi đang vẽ kính: đo ở chế độ Nhẹ thì chẳng nói lên gì.
+        if (!BootPerfLite()) BootPerfSample(GetFrameTime());
         HubScreenUpdate(app, dt);
     } else {
         const GameEntry *game = GameRegistryGet(app->activeGame);

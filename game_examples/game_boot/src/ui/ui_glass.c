@@ -44,6 +44,10 @@ static struct {
     bool shaderReady;
 } G = {0};
 
+// Nằm ngoài G vì G bị xoá trắng mỗi lần Init/Shutdown, còn chế độ Nhẹ là
+// lựa chọn của người dùng phải giữ nguyên qua các lần đó.
+static bool s_lite = false;
+
 // ---------------------------------------------------------------- Tiện ích
 
 static Texture2D MakeWhitePixel(void)
@@ -137,21 +141,8 @@ void UiGlassInit(int width, int height)
     G.blurAmount = 0.62f;
     G.levelScale = 0.80f;
 
-    G.backdrop = LoadRenderTexture(width, height);
-    SetTextureFilter(G.backdrop.texture, TEXTURE_FILTER_BILINEAR);
-    SetTextureWrap(G.backdrop.texture, TEXTURE_WRAP_CLAMP);
-
-    int bw = width / GLASS_BLUR_DIV;
-    int bh = height / GLASS_BLUR_DIV;
-    if (bw < 2) bw = 2;
-    if (bh < 2) bh = 2;
-
-    G.blurA = LoadRenderTexture(bw, bh);
-    G.blurB = LoadRenderTexture(bw, bh);
-    SetTextureFilter(G.blurA.texture, TEXTURE_FILTER_BILINEAR);
-    SetTextureFilter(G.blurB.texture, TEXTURE_FILTER_BILINEAR);
-    SetTextureWrap(G.blurA.texture, TEXTURE_WRAP_CLAMP);
-    SetTextureWrap(G.blurB.texture, TEXTURE_WRAP_CLAMP);
+    // Render target được cấp khi cần tới (UiGlassBeginBackdrop), vì chế độ
+    // Nhẹ không dùng chúng.
 
     G.blurShader   = LoadGlassShader(UI_GLASS_BLUR_FS);
     G.panelShader  = LoadGlassShader(UI_GLASS_PANEL_FS);
@@ -173,6 +164,37 @@ void UiGlassInit(int width, int height)
     G.ready = true;
 }
 
+// Nền + hai tầng blur tốn ~8 MB bộ nhớ GPU. Trên Pi, bộ nhớ này (CMA) dùng
+// chung với game đang chạy, nên chỉ giữ khi đang vẽ kính thật.
+static void EnsureTargets(void)
+{
+    if (IsRenderTextureValid(G.backdrop)) return;
+
+    G.backdrop = LoadRenderTexture(G.width, G.height);
+    SetTextureFilter(G.backdrop.texture, TEXTURE_FILTER_BILINEAR);
+    SetTextureWrap(G.backdrop.texture, TEXTURE_WRAP_CLAMP);
+
+    int bw = G.width / GLASS_BLUR_DIV;
+    int bh = G.height / GLASS_BLUR_DIV;
+    if (bw < 2) bw = 2;
+    if (bh < 2) bh = 2;
+
+    G.blurA = LoadRenderTexture(bw, bh);
+    G.blurB = LoadRenderTexture(bw, bh);
+    SetTextureFilter(G.blurA.texture, TEXTURE_FILTER_BILINEAR);
+    SetTextureFilter(G.blurB.texture, TEXTURE_FILTER_BILINEAR);
+    SetTextureWrap(G.blurA.texture, TEXTURE_WRAP_CLAMP);
+    SetTextureWrap(G.blurB.texture, TEXTURE_WRAP_CLAMP);
+}
+
+static void ReleaseTargets(void)
+{
+    if (IsRenderTextureValid(G.backdrop)) UnloadRenderTexture(G.backdrop);
+    if (IsRenderTextureValid(G.blurA))    UnloadRenderTexture(G.blurA);
+    if (IsRenderTextureValid(G.blurB))    UnloadRenderTexture(G.blurB);
+    G.backdrop = G.blurA = G.blurB = (RenderTexture2D){0};
+}
+
 void UiGlassShutdown(void)
 {
     if (!G.ready) return;
@@ -181,9 +203,7 @@ void UiGlassShutdown(void)
     if (IsShaderValid(G.panelShader))  UnloadShader(G.panelShader);
     if (IsShaderValid(G.strokeShader)) UnloadShader(G.strokeShader);
 
-    if (IsRenderTextureValid(G.backdrop)) UnloadRenderTexture(G.backdrop);
-    if (IsRenderTextureValid(G.blurA))    UnloadRenderTexture(G.blurA);
-    if (IsRenderTextureValid(G.blurB))    UnloadRenderTexture(G.blurB);
+    ReleaseTargets();
     if (IsTextureValid(G.whitePixel))     UnloadTexture(G.whitePixel);
 
     memset(&G, 0, sizeof(G));
@@ -210,16 +230,31 @@ void UiGlassSetLevelScale(float scale)
     G.levelScale = scale;
 }
 
+void UiGlassSetLite(bool lite)
+{
+    s_lite = lite;
+    if (lite && G.ready) ReleaseTargets();
+}
+
+bool UiGlassIsLite(void)
+{
+    return s_lite;
+}
+
 bool UiGlassIsShaderReady(void)
 {
-    return G.ready && G.shaderReady;
+    return G.ready && G.shaderReady && !s_lite && IsRenderTextureValid(G.backdrop);
 }
 
 // ---------------------------------------------------------------- Hình nền
 
 void UiGlassBeginBackdrop(void)
 {
-    if (!G.ready) return;
+    // Chế độ Nhẹ không lấy mẫu hậu cảnh nên bỏ hẳn cả lượt vẽ nền phụ lẫn
+    // các vòng blur - trên GPU dạng tile mỗi lần đổi render target rất đắt.
+    if (!G.ready || s_lite) return;
+    EnsureTargets();
+    if (!IsRenderTextureValid(G.backdrop)) return;
     BeginTextureMode(G.backdrop);
 }
 
@@ -240,7 +275,7 @@ static void BlurPass(RenderTexture2D src, RenderTexture2D dst, Vector2 dir)
 
 void UiGlassEndBackdrop(void)
 {
-    if (!G.ready) return;
+    if (!G.ready || s_lite || !IsRenderTextureValid(G.backdrop)) return;
     EndTextureMode();
 
     if (!G.shaderReady) return;
@@ -365,6 +400,18 @@ static void DrawFallbackPanel(Rectangle rec, float radius, UiGlassStyle style)
     DrawRectangleRoundedLinesEx(rec, roundness, 12, 1.2f, UiAlpha(UI.strokeSoft, style.highlight));
 }
 
+// Ảnh (tranh hero, thumbnail) khi không có shader: vẽ thẳng texture, góc
+// vuông. Thay vì một tấm xám như DrawFallbackPanel, để nội dung vẫn nhìn thấy.
+static void DrawFallbackImage(Rectangle rec, Texture2D tex, bool flipY, UiGlassStyle style)
+{
+    float h = (float)tex.height;
+    DrawTexturePro(tex, (Rectangle){0, 0, (float)tex.width, flipY ? -h : h},
+                   rec, (Vector2){0, 0}, 0.0f, UiAlpha(WHITE, style.alpha));
+    if (style.tintStrength > 0.01f) {
+        DrawRectangleRec(rec, UiAlpha(style.tint, style.tintStrength));
+    }
+}
+
 // Số pixel màn hình ứng với 1 đơn vị toạ độ giao diện, đọc từ ma trận đang áp
 // dụng (Hub vẽ ở 1280x720 rồi rlScalef theo cửa sổ). GPU không có dFdx/dFdy
 // (vd. VC4 của Raspberry Pi 0-3) cần số này để bề rộng khử răng cưa bằng đúng
@@ -436,8 +483,12 @@ void UiGlassImagePanel(Rectangle rec, float radius, Texture2D tex, bool flipY, U
 {
     if (rec.width <= 0.0f || rec.height <= 0.0f) return;
 
-    if (!UiGlassIsShaderReady() || !IsTextureValid(tex)) {
+    if (!IsTextureValid(tex)) {
         DrawFallbackPanel(rec, radius, style);
+        return;
+    }
+    if (!UiGlassIsShaderReady()) {
+        DrawFallbackImage(rec, tex, flipY, style);
         return;
     }
 

@@ -39,6 +39,11 @@ void UiGlassInit(int width, int height);
 void UiGlassShutdown(void);
 bool UiGlassIsShaderReady(void);
 
+// Chế độ Nhẹ: bỏ mọi shader và render target, vẽ bằng primitive thường.
+// Dành cho GPU yếu (Raspberry Pi 0-3, trình dựng phần mềm).
+void UiGlassSetLite(bool lite);
+bool UiGlassIsLite(void);
+
 // Độ mờ của lớp hậu cảnh mà kính lấy mẫu: 0 = nhìn xuyên gần như nguyên bản,
 // 1 = mờ tối đa. Điều khiển cả số vòng lọc lẫn bán kính nên chỉnh liên tục
 // mà không bị nhảy bậc.

@@ -11,6 +11,8 @@
 #include "boot_app.h"
 #include "boot_settings.h"
 #include "boot_input.h"
+#include "boot_perf.h"
+#include "perf_hint.h"
 #include "ui_theme.h"
 #include "ui_anim.h"
 #include "ui_glass.h"
@@ -192,6 +194,12 @@ void HubScreenUpdate(BootApp *app, float dt)
 void HubScreenPrepare(BootApp *app)
 {
     RefreshContext(app);
+
+    // Đặt trước mọi lệnh vẽ của khung hình để Begin/EndBackdrop và các tấm
+    // kính cùng thấy một chế độ. Game mở từ Hub cũng đọc lại qua PerfHintLite().
+    bool lite = BootPerfLite();
+    UiGlassSetLite(lite);
+    PerfHintSetLite(lite);
 
     UiGlassBeginBackdrop();
         HubBackgroundDraw(HUB_VIRTUAL_WIDTH, HUB_VIRTUAL_HEIGHT, app->globalTime);

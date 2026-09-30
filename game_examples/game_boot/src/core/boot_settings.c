@@ -9,6 +9,7 @@
 static BootSettings s_settings = {
     .glassBlur = 0.62f,
     .glassTint = 0.80f,
+    .graphicsMode = BOOT_GFX_AUTO,
     .showFps = false,
     .reduceMotion = false,
     .masterVolume = 0.7f,
@@ -53,6 +54,7 @@ void BootSettingsLoad(void)
             s_settings.glassBlur = (value >= 1.0f) ? 0.62f : 0.18f;
             s_settings.glassTint = (value >= 1.0f) ? 0.80f : 0.65f;
         }
+        else if (strcmp(key, "graphics_mode") == 0) s_settings.graphicsMode = (int)value;
         else if (strcmp(key, "show_fps") == 0)      s_settings.showFps = (value >= 0.5f);
         else if (strcmp(key, "reduce_motion") == 0) s_settings.reduceMotion = (value >= 0.5f);
         else if (strcmp(key, "master_volume") == 0) s_settings.masterVolume = value;
@@ -66,6 +68,9 @@ void BootSettingsLoad(void)
     if (s_settings.glassBlur > 1.0f) s_settings.glassBlur = 1.0f;
     if (s_settings.glassTint < 0.0f) s_settings.glassTint = 0.0f;
     if (s_settings.glassTint > 1.0f) s_settings.glassTint = 1.0f;
+    if (s_settings.graphicsMode < 0 || s_settings.graphicsMode >= BOOT_GFX_COUNT) {
+        s_settings.graphicsMode = BOOT_GFX_AUTO;
+    }
 }
 
 void BootSettingsSave(void)
@@ -75,6 +80,7 @@ void BootSettingsSave(void)
 
     fprintf(f, "glass_blur %.3f\n", s_settings.glassBlur);
     fprintf(f, "glass_tint %.3f\n", s_settings.glassTint);
+    fprintf(f, "graphics_mode %d\n", s_settings.graphicsMode);
     fprintf(f, "show_fps %d\n", s_settings.showFps ? 1 : 0);
     fprintf(f, "reduce_motion %d\n", s_settings.reduceMotion ? 1 : 0);
     fprintf(f, "master_volume %.3f\n", s_settings.masterVolume);

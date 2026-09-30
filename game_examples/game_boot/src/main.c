@@ -7,6 +7,7 @@
 #include "raylib.h"
 #include "boot_types.h"
 #include "boot_app.h"
+#include "boot_perf.h"
 #include "font_vn.h"
 
 #include <stdlib.h>
@@ -45,8 +46,13 @@ static void FitWindowToMonitor(void)
 int main(void)
 {
     DisableInputMethod();
+    BootPerfInit();
 
-    SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_VSYNC_HINT | FLAG_MSAA_4X_HINT | FLAG_WINDOW_HIGHDPI);
+    // MSAA 4x nhân bộ nhớ tile và băng thông lên nhiều lần: trên GPU yếu
+    // (Raspberry Pi 0-3) bỏ hẳn, chỉ đổi lại mép hình bo góc hơi răng cưa.
+    unsigned int flags = FLAG_WINDOW_RESIZABLE | FLAG_VSYNC_HINT | FLAG_WINDOW_HIGHDPI;
+    if (!BootPerfWeakDevice()) flags |= FLAG_MSAA_4X_HINT;
+    SetConfigFlags(flags);
     InitWindow(1280, 720, WINDOW_TITLE);
     SetWindowMinSize(WINDOW_MIN_WIDTH, WINDOW_MIN_HEIGHT);
     SetTargetFPS(60);

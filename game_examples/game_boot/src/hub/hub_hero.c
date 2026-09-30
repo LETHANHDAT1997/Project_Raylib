@@ -7,6 +7,7 @@
 #include "ui_icons.h"
 #include "ui_anim.h"
 #include "boot_viewport.h"
+#include "boot_perf.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -47,6 +48,8 @@ void HubHeroPrepare(HubContext *ctx, Rectangle area)
     float scale = BootViewportScale();
     if (scale < 1.0f) scale = 1.0f;
     if (scale > 3.0f) scale = 3.0f;
+    // Máy yếu: vẽ ở độ phân giải thiết kế rồi phóng lên, đỡ tốn fill-rate.
+    if (BootPerfLite()) scale = 1.0f;
 
     int w = (int)(area.width * scale + 0.5f);
     int h = (int)(area.height * scale + 0.5f);

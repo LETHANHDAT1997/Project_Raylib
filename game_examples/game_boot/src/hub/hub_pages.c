@@ -2,6 +2,7 @@
 #include "boot_stats.h"
 #include "save_data.h"
 #include "boot_settings.h"
+#include "boot_perf.h"
 #include "hub_wallpaper.h"
 #include "ui_theme.h"
 #include "ui_glass.h"
@@ -449,8 +450,10 @@ void HubSettingsPageDraw(HubContext *ctx, Rectangle area)
 
     // 1. Độ mờ hậu cảnh của lớp kính
     {
+        const char *desc = UiGlassIsLite() ? "Không dùng ở đồ hoạ Nhẹ (xem cột Hệ thống)"
+                                           : "Kéo về trái để kính trong, về phải để mờ sâu";
         SettingRowLayout r = SettingRow(panel, y, rowH, UiIconSparkle, "Độ mờ hậu cảnh",
-                                        "Kéo về trái để kính trong, về phải để mờ sâu", ctx->accent);
+                                        desc, ctx->accent);
         if (SettingSlider(r, &cfg->glassBlur, ctx->accent)) {
             UiGlassSetBlurAmount(cfg->glassBlur);
             changed = true;
@@ -540,7 +543,7 @@ void HubSettingsPageDraw(HubContext *ctx, Rectangle area)
         {UiIconDisplay, "Cửa sổ",       resolution},
         {UiIconCounter, "FPS hiện tại", fps},
         {UiIconClock,   "Tần số quét",  monitor},
-        {UiIconSparkle, "Shader kính",  UiGlassIsShaderReady() ? "Bật" : "Dự phòng"}
+        {UiIconSparkle, "Shader kính",  UiGlassIsShaderReady() ? "Bật" : (UiGlassIsLite() ? "Tắt (Nhẹ)" : "Dự phòng")}
     };
 
     float iy = side.y + UI_PAD_LG + 42.0f;
@@ -582,6 +585,25 @@ void HubSettingsPageDraw(HubContext *ctx, Rectangle area)
     }
     if (shown != dir) shown = TextFormat("…%s", shown);
     UiText(shown, (Vector2){about.x + UI_PAD_MD, about.y + UI_PAD_MD + 70.0f}, UI_FS_SMALL, UI.textSecondary);
+
+    // Chất lượng đồ hoạ: hiệu ứng kính quá nặng cho GPU của Raspberry Pi 0-3.
+    // Áp dụng cho cả Hub lẫn Caro / Cờ Vua (qua PerfHintLite).
+    float gy = about.y + about.height + UI_PAD_LG;
+    UiTextBold("Chất lượng đồ hoạ", (Vector2){side.x + UI_PAD_LG, gy}, UI_FS_BODY, UI.textPrimary);
+
+    const char *gfxHint;
+    if (cfg->graphicsMode == BOOT_GFX_QUALITY)   gfxHint = "Luôn bật hiệu ứng kính";
+    else if (cfg->graphicsMode == BOOT_GFX_LITE) gfxHint = "Giảm hiệu ứng ở Hub, Caro, Cờ Vua";
+    else if (BootPerfLite())                     gfxHint = TextFormat("Đang dùng Nhẹ: %s", BootPerfReason());
+    else                                         gfxHint = "Đang dùng Đẹp";
+    UiText(gfxHint, (Vector2){side.x + UI_PAD_LG, gy + 22.0f}, UI_FS_SMALL, UI.textMuted);
+
+    static const char *const GFX_LABELS[BOOT_GFX_COUNT] = {"Tự động", "Đẹp", "Nhẹ"};
+    Rectangle seg = {side.x + UI_PAD_LG, gy + 46.0f, side.width - UI_PAD_LG * 2.0f, 34.0f};
+    if (UiSegmented(seg, GFX_LABELS, BOOT_GFX_COUNT, &cfg->graphicsMode, ctx->accent).clicked) {
+        BootPerfResetMeasure();
+        BootSettingsSave();
+    }
 
     // Xoá toàn bộ thống kê: hành động không hoàn tác nên cần bấm xác nhận hai bước.
     static bool confirming = false;
