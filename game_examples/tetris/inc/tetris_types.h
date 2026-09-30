@@ -1,6 +1,9 @@
 #ifndef TETRIS_TYPES_H
 #define TETRIS_TYPES_H
 
+// Khoá lưu dữ liệu (common/save_data) - phải trùng id của game trong Arcade Hub.
+#define TETRIS_SAVE_ID "tetris"
+
 #include "raylib.h"
 #include <stdbool.h>
 

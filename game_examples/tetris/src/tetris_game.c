@@ -2,6 +2,7 @@
 #include "tetris_board.h"
 #include "tetris_piece.h"
 #include "tetris_audio.h"
+#include "save_data.h"
 #include <stdio.h>
 #include <math.h>
 
@@ -105,7 +106,7 @@ void ResetGame(TetrisGame *game)
 
 void InitGame(TetrisGame *game)
 {
-    game->highScore = 0;
+    game->highScore = SaveDataGetInt(TETRIS_SAVE_ID, "best", 0);
     game->soundEnabled = true;
     ResetGame(game);
 }
@@ -142,6 +143,8 @@ void UpdateGame(TetrisGame *game, float dt)
 
     // Game state transitions
     if (game->state == STATE_GAME_OVER) {
+        // Idempotent: chỉ ghi đĩa đúng một lần khi điểm vượt kỷ lục đã lưu.
+        SaveDataSubmitBest(TETRIS_SAVE_ID, "best", game->score);
         if (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_R) || IsKeyPressed(KEY_SPACE)) {
             ResetGame(game);
         }

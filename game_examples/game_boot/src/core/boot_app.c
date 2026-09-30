@@ -5,6 +5,7 @@
 #include "boot_settings.h"
 #include "boot_input.h"
 #include "game_registry.h"
+#include "save_data.h"
 
 #include "hub_screen.h"
 #include "hub_overlay.h"
@@ -26,6 +27,10 @@ void BootAppInit(BootApp *app)
 
     BootSettingsLoad();
     BootStatsLoad();
+    for (int i = 0; i < GameRegistryCount(); i++) {
+        const GameEntry *g = GameRegistryGet(i);
+        if (g && g->migrateSave) g->migrateSave();
+    }
 
     app->canvas = (BootCanvas){0};
     BootViewportUpdate(&app->viewport, HUB_VIRTUAL_WIDTH, HUB_VIRTUAL_HEIGHT);
@@ -77,6 +82,7 @@ static void CommitTransition(BootApp *app)
     if (target < 0) {
         app->state = BOOT_STATE_HUB;
         CloseBootCanvas(&app->canvas);
+        SaveDataInvalidate();
     } else {
         const GameEntry *game = GameRegistryGet(target);
         if (game) {
@@ -120,6 +126,11 @@ void BootAppUpdate(BootApp *app, float dt)
 
     if (BootInputPressed(BOOT_ACTION_FULLSCREEN)) ToggleFullscreen();
     if (BootInputPressed(BOOT_ACTION_SCREENSHOT)) TakeScreenshot("arcade_hub_screenshot.png");
+    if (BootInputPressed(BOOT_ACTION_TOGGLE_FPS)) {
+        BootSettings *cfg = BootSettingsGet();
+        cfg->showFps = !cfg->showFps;
+        BootSettingsSave();
+    }
 
     if (app->state == BOOT_STATE_GAME && BootInputPressed(BOOT_ACTION_HOME)) {
         BootAppRequestGame(app, -1);

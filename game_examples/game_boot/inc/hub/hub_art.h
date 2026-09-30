@@ -20,4 +20,10 @@ void HubArtSnakeHero(Rectangle area, float time);
 void HubArtFighterIcon(Rectangle area, float time);
 void HubArtFighterHero(Rectangle area, float time);
 
+void HubArtFlappyIcon(Rectangle area, float time);
+void HubArtFlappyHero(Rectangle area, float time);
+
+// Giải phóng texture mà artwork dùng sprite thật (Flappy Plane) đã nạp.
+void HubArtRelease(void);
+
 #endif // HUB_ART_H

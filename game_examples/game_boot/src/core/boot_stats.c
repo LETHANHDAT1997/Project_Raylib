@@ -1,17 +1,29 @@
 #include "boot_stats.h"
 #include "game_registry.h"
 #include "raylib.h"
+#include "save_data.h"
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
 #include <math.h>
 
-#define STATS_FILE     "game_boot_stats.txt"
+#define STATS_FILE     SaveDataFilePath("game_boot_stats.txt")
 #define STATS_VERSION  1
 
 static GameStats s_stats[BOOT_MAX_GAMES];
 static double    s_sessionStart[BOOT_MAX_GAMES];
 static bool      s_dirty = false;
+
+// Bản cũ ghi file ngay tại thư mục đang chạy Hub: chép nguyên nội dung sang
+// thư mục dữ liệu chung (chỉ khi bên đó chưa có file).
+static void ImportLegacyStats(const char *legacyPath)
+{
+    if (FileExists(STATS_FILE)) return;
+    char *text = LoadFileText(legacyPath);
+    if (!text) return;
+    SaveFileText(STATS_FILE, text);
+    UnloadFileText(text);
+}
 
 static bool ValidIndex(int i)
 {
@@ -25,6 +37,7 @@ void BootStatsLoad(void)
     memset(s_stats, 0, sizeof(s_stats));
     memset(s_sessionStart, 0, sizeof(s_sessionStart));
 
+    SaveDataMigrateLegacy("game_boot_stats.txt", ImportLegacyStats);
     if (!FileExists(STATS_FILE)) return;
 
     FILE *f = fopen(STATS_FILE, "r");
@@ -81,6 +94,9 @@ void BootStatsReset(int gameIndex)
     s_stats[gameIndex] = (GameStats){0};
     s_dirty = true;
     BootStatsSave();
+
+    const GameEntry *g = GameRegistryGet(gameIndex);
+    if (g) SaveDataClearGame(g->id);
 }
 
 void BootStatsResetAll(void)
@@ -88,6 +104,19 @@ void BootStatsResetAll(void)
     memset(s_stats, 0, sizeof(s_stats));
     s_dirty = true;
     BootStatsSave();
+
+    for (int i = 0; i < GameRegistryCount(); i++) {
+        const GameEntry *g = GameRegistryGet(i);
+        if (g) SaveDataClearGame(g->id);
+    }
+}
+
+bool BootStatsGetRecord(int gameIndex, int *outValue)
+{
+    const GameEntry *g = GameRegistryGet(gameIndex);
+    if (!g || !g->recordLabel || !SaveDataHasKey(g->id, "best")) return false;
+    if (outValue) *outValue = SaveDataGetInt(g->id, "best", 0);
+    return true;
 }
 
 void BootStatsBeginSession(int gameIndex)

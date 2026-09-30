@@ -1,4 +1,5 @@
 #include "hub_screen.h"
+#include "hub_art.h"
 #include "hub_background.h"
 #include "hub_wallpaper.h"
 #include "hub_topbar.h"
@@ -99,6 +100,7 @@ void HubScreenInit(BootApp *app)
 void HubScreenClose(void)
 {
     HubHeroRelease();
+    HubArtRelease();
     HubWallpaperShutdown();
     UiGlassShutdown();
 }

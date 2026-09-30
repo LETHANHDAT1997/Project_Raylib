@@ -1,9 +1,11 @@
 #include "hub_art.h"
 #include "ui_theme.h"
+#include "flappy_assets.h"
 #include <math.h>
 
-// Artwork vẽ hoàn toàn bằng primitive nên không cần file ảnh và luôn sắc nét
-// ở mọi độ phân giải. Mỗi game có hai biến thể: icon vuông nhỏ và tranh hero.
+// Artwork vẽ bằng primitive nên không cần file ảnh và luôn sắc nét ở mọi độ
+// phân giải (riêng Flappy Plane dùng thẳng sprite của game, xem cuối file).
+// Mỗi game có hai biến thể: icon vuông nhỏ và tranh hero.
 
 // Toạ độ tương đối 0..1 trong khung art, giúp cùng một hình dùng lại được
 // ở cả icon lẫn hero mà không phải tính lại tỉ lệ.
@@ -363,4 +365,100 @@ void HubArtFighterHero(Rectangle area, float time)
     EndBlendMode();
     DrawCircleV(orb, r, UiAlpha((Color){170, 220, 255, 255}, 0.92f));
     DrawCircleV(orb, r * 0.55f, UiAlpha(WHITE, 0.95f));
+}
+
+// --------------------------------------------------------------- FLAPPY
+
+// Flappy Plane dùng thẳng bộ sprite CC0 của game thay vì vẽ primitive, nên
+// artwork nạp texture (dùng chung bộ đếm tham chiếu với game) ngay lần vẽ đầu.
+static bool s_flappyArtLoaded = false;
+
+static const FlappyAssets *FlappyArt(void)
+{
+    if (!s_flappyArtLoaded) {
+        LoadFlappyAssets();
+        s_flappyArtLoaded = true;
+    }
+    return FlappyAssetsGet();
+}
+
+void HubArtRelease(void)
+{
+    if (s_flappyArtLoaded) {
+        UnloadFlappyAssets();
+        s_flappyArtLoaded = false;
+    }
+}
+
+static void DrawTexCentered(Texture2D tex, Vector2 c, float scale, float rot)
+{
+    Rectangle src = {0.0f, 0.0f, (float)tex.width, (float)tex.height};
+    Rectangle dst = {c.x, c.y, tex.width * scale, tex.height * scale};
+    DrawTexturePro(tex, src, dst, (Vector2){dst.width * 0.5f, dst.height * 0.5f}, rot, WHITE);
+}
+
+void HubArtFlappyIcon(Rectangle area, float time)
+{
+    const FlappyAssets *a = FlappyArt();
+    Vector2 c = At(area, 0.5f, 0.5f);
+    DrawCircleV(c, Unit(area) * 0.46f, (Color){196, 232, 248, 255});
+    DrawCircleV(At(area, 0.5f, 0.62f), Unit(area) * 0.30f, UiAlpha(WHITE, 0.55f));
+
+    int frame = (int)(time * 18.0f) % PLANE_FRAMES;
+    float bob = sinf(time * 3.0f) * Unit(area) * 0.04f;
+    float scale = Unit(area) * 0.86f / (float)a->plane[0][0].width;
+    DrawTexCentered(a->plane[0][frame], (Vector2){c.x, c.y + bob}, scale, sinf(time * 3.0f + 1.0f) * 6.0f);
+}
+
+void HubArtFlappyHero(Rectangle area, float time)
+{
+    const FlappyAssets *a = FlappyArt();
+
+    // Nền trời Kenney phủ kín khung, cuộn chậm sang trái
+    float s = area.height / (float)a->background.height;
+    float bgW = a->background.width * s;
+    float off = fmodf(time * 18.0f * s, bgW);
+    for (int i = 0; i < 3; i++) {
+        Rectangle src = {0.0f, 0.0f, (float)a->background.width, (float)a->background.height};
+        Rectangle dst = {area.x - off + i * bgW, area.y, bgW + 1.0f, area.height};
+        DrawTexturePro(a->background, src, dst, (Vector2){0.0f, 0.0f}, 0.0f, WHITE);
+    }
+
+    // Hai cặp đá ở nửa phải (nửa trái chừa cho chữ)
+    float groundTop = area.y + area.height - GROUND_TEX_H * s;
+    float rockW = ROCK_W * s, rockH = ROCK_H * s;
+    const float rx[2] = {0.60f, 0.84f};
+    const float gapC[2] = {0.44f, 0.36f};
+    for (int i = 0; i < 2; i++) {
+        float x = area.x + area.width * rx[i] - rockW * 0.5f;
+        float gap = area.height * 0.34f;
+        float topTip = area.y + area.height * gapC[i] - gap * 0.5f;
+        float bottomTip = topTip + gap;
+        float topH = fmaxf(rockH, topTip - area.y + 10.0f);
+        float bottomH = fmaxf(rockH, area.y + area.height - bottomTip + 4.0f);
+        Rectangle src = {0.0f, 0.0f, (float)ROCK_W, (float)ROCK_H};
+        DrawTexturePro(a->rockDown[i], src, (Rectangle){x, topTip - topH, rockW, topH}, (Vector2){0}, 0.0f, WHITE);
+        DrawTexturePro(a->rock[i], src, (Rectangle){x, bottomTip, rockW, bottomH}, (Vector2){0}, 0.0f, WHITE);
+    }
+
+    // Sao lấp lánh giữa hai cặp đá
+    float starScale = s * (0.85f + 0.1f * sinf(time * 5.0f));
+    DrawTexCentered(a->star[STAR_GOLD], At(area, 0.72f, 0.30f + 0.02f * sinf(time * 3.0f)), starScale, 0.0f);
+
+    // Dải đất cuộn nhanh hơn nền (thị sai)
+    float gW = GROUND_TEX_W * s;
+    float gOff = fmodf(time * 90.0f * s, gW);
+    for (int i = 0; i < 3; i++) {
+        Rectangle src = {0.0f, 0.0f, (float)GROUND_TEX_W, (float)GROUND_TEX_H};
+        Rectangle dst = {area.x - gOff + i * gW, groundTop, gW + 1.0f, GROUND_TEX_H * s};
+        DrawTexturePro(a->ground[0], src, dst, (Vector2){0.0f, 0.0f}, 0.0f, WHITE);
+    }
+
+    // Máy bay nhấp nhô xuyên qua khe đá
+    int frame = (int)(time * 20.0f) % PLANE_FRAMES;
+    float wave = sinf(time * 2.2f);
+    Vector2 plane = At(area, 0.50f, 0.42f + wave * 0.06f);
+    DrawTexCentered(a->puffSmall, (Vector2){plane.x - 44.0f * s, plane.y + 4.0f * s}, s * 0.7f, time * 40.0f);
+    DrawTexCentered(a->puffLarge, (Vector2){plane.x - 70.0f * s, plane.y + 8.0f * s}, s * 0.55f, -time * 30.0f);
+    DrawTexCentered(a->plane[1][frame], plane, s * 0.85f, -wave * 12.0f);
 }

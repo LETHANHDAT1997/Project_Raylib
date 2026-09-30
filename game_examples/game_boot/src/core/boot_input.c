@@ -33,6 +33,7 @@ static const ActionBinding BINDINGS[BOOT_ACTION_COUNT] = {
     [BOOT_ACTION_HOME]       = {{KEY_F1, KEY_HOME, 0, 0}, false},
     [BOOT_ACTION_FULLSCREEN] = {{KEY_F11, 0, 0, 0}, false},
     [BOOT_ACTION_SCREENSHOT] = {{KEY_F12, 0, 0, 0}, false},
+    [BOOT_ACTION_TOGGLE_FPS] = {{KEY_F3, 0, 0, 0}, false},
 };
 
 static ActionState s_state[BOOT_ACTION_COUNT];

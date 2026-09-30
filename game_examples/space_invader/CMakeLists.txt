@@ -26,11 +26,13 @@ if(NOT TARGET raylib)
 endif()
 
 file(GLOB_RECURSE SPACE_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/*.c")
+file(GLOB COMMON_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/../common/*.c")
 
-add_executable(space_invader ${SPACE_SOURCES})
+add_executable(space_invader ${SPACE_SOURCES} ${COMMON_SOURCES})
 
 target_include_directories(space_invader PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/inc"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../common"
 )
 
 target_link_libraries(space_invader PRIVATE

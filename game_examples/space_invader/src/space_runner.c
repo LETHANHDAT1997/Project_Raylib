@@ -2,6 +2,7 @@
 #include "space_types.h"
 #include "space_game.h"
 #include "space_audio.h"
+#include "save_data.h"
 
 static SpaceGame s_spaceGame;
 static bool s_spaceInitialized = false;
@@ -30,6 +31,8 @@ void DrawSpaceApp(void)
 void CloseSpaceApp(void)
 {
     if (s_spaceInitialized) {
+        // Thoát giữa ván (F1 về Hub) vẫn giữ lại kỷ lục vừa lập.
+        SaveDataSubmitBest(SPACE_SAVE_ID, "best", s_spaceGame.highScore);
         CloseSpaceAudio();
         s_spaceInitialized = false;
     }

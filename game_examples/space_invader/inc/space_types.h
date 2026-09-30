@@ -1,6 +1,9 @@
 #ifndef SPACE_TYPES_H
 #define SPACE_TYPES_H
 
+// Khoá lưu dữ liệu (common/save_data) - phải trùng id của game trong Arcade Hub.
+#define SPACE_SAVE_ID "space_invader"
+
 #include "raylib.h"
 #include <stdbool.h>
 

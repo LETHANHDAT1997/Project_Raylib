@@ -1,5 +1,6 @@
 #include "hub_pages.h"
 #include "boot_stats.h"
+#include "save_data.h"
 #include "boot_settings.h"
 #include "hub_wallpaper.h"
 #include "ui_theme.h"
@@ -9,6 +10,8 @@
 #include "ui_focus.h"
 
 #include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
 #include <math.h>
 
 // ------------------------------------------------------- Trang Điều khiển
@@ -20,10 +23,15 @@ static const char *GLOBAL_KEYS[][2] = {
     {"1 … 9",            "Chọn nhanh theo số thứ tự"},
     {"Tab",              "Chuyển qua lại giữa các trang"},
     {"F1 / Home",        "Thoát game, quay lại Hub"},
+    {"F3",               "Bật/tắt bộ đếm FPS (cả khi đang chơi)"},
     {"F11",              "Bật/tắt toàn màn hình"},
     {"Esc",              "Về trang Thư viện"}
 };
 #define GLOBAL_KEY_COUNT ((int)(sizeof(GLOBAL_KEYS) / sizeof(GLOBAL_KEYS[0])))
+
+// Thẻ phím của từng game: phần đầu (icon + tên) rồi mỗi phím một dòng.
+#define CONTROL_CARD_HEADER (UI_PAD_MD + 38.0f + UI_PAD_SM)
+#define CONTROL_LINE_H      22.0f
 
 // Một dòng phím: ô phím kiểu keycap bên trái, mô tả bên phải.
 static void DrawKeyRow(Rectangle row, const char *key, const char *desc, Color accent)
@@ -47,7 +55,7 @@ static void DrawKeyRow(Rectangle row, const char *key, const char *desc, Color a
 }
 
 // Thẻ phím của một game trong lưới bên phải.
-static void DrawGameControlCard(HubContext *ctx, Rectangle card, const GameEntry *game, bool selected)
+static void DrawGameControlCard(HubContext *ctx, Rectangle card, const GameEntry *game, bool selected, int focus)
 {
     UiGlassStyle style = UiGlassStyleRaised();
     style.alpha = selected ? 0.72f : 0.46f;
@@ -61,7 +69,7 @@ static void DrawGameControlCard(HubContext *ctx, Rectangle card, const GameEntry
     UiGlassStroke(card, UI_RADIUS_MD, 1.1f, selected ? UiAlpha(UI.strokeHighlight, 0.9f) : UiAlpha(UI.strokeSoft, 0.7f));
 
     // Nhấn hoặc focus rồi Enter để đổi game đang chọn của cả launcher.
-    int focus = UiFocusRegister(card, UI_FOCUS_FLAG_NONE);
+    // (focus do trang đăng ký sẵn cho mọi thẻ, kể cả thẻ đang bị cuộn khuất.)
     if (UiHitTest(card).clicked || UiFocusActivated(focus)) {
         ctx->app->selectedGame = GameRegistryIndexOfId(game->id);
     }
@@ -81,13 +89,13 @@ static void DrawGameControlCard(HubContext *ctx, Rectangle card, const GameEntry
     UiTextBold(game->title, (Vector2){thumbBox.x + thumb + UI_PAD_SM, card.y + UI_PAD_MD + 10.0f},
                UI_FS_H3, UI.textPrimary);
 
-    float y = card.y + UI_PAD_MD + thumb + UI_PAD_SM;
+    float y = card.y + CONTROL_CARD_HEADER;
     float textW = card.width - UI_PAD_MD * 2.0f - 14.0f;
     for (int i = 0; i < game->controlCount; i++) {
         DrawCircleV((Vector2){card.x + UI_PAD_MD + 3.0f, y + 8.0f}, 3.0f, UiAlpha(game->accent, 0.9f));
         UiText(UiTextEllipsis(game->controls[i], UI_FS_SMALL, false, textW),
                (Vector2){card.x + UI_PAD_MD + 14.0f, y}, UI_FS_SMALL, UI.textSecondary);
-        y += 22.0f;
+        y += CONTROL_LINE_H;
     }
 }
 
@@ -139,25 +147,95 @@ void HubControlsPageDraw(HubContext *ctx, Rectangle area)
 
     int count = GameRegistryCount();
     const int cols = 2;
-    int rows = (count + cols - 1) / cols;
-    if (rows < 1) rows = 1;
+    int totalRows = (count + cols - 1) / cols;
 
+    // Chiều cao thẻ tính theo game có nhiều dòng phím nhất để chữ không bao giờ
+    // tràn khỏi thẻ; khung không đủ chỗ thì cuộn theo từng hàng (giống sidebar)
+    // thay vì bóp thẻ lại. Thêm game mới không phải chỉnh gì ở đây.
+    int maxLines = 1;
+    for (int i = 0; i < count; i++) {
+        const GameEntry *g = GameRegistryGet(i);
+        if (g && g->controlCount > maxLines) maxLines = g->controlCount;
+    }
+    float cellGap = 14.0f;
     float gridTop = right.y + UI_PAD_LG + 62.0f;
     float gridH = right.y + right.height - UI_PAD_LG - gridTop;
-    float cellGap = 14.0f;
     float cardW = (right.width - UI_PAD_LG * 2.0f - cellGap * (cols - 1)) / (float)cols;
-    float cardH = (gridH - cellGap * (rows - 1)) / (float)rows;
-    if (cardH > 210.0f) cardH = 210.0f;
+    float cardH = CONTROL_CARD_HEADER + maxLines * CONTROL_LINE_H + UI_PAD_SM;
 
-    for (int i = 0; i < count; i++) {
+    int visibleRows = (int)((gridH + cellGap) / (cardH + cellGap));
+    if (visibleRows < 1) visibleRows = 1;
+    if (visibleRows > totalRows) visibleRows = totalRows;
+    if (totalRows <= visibleRows) {
+        // Đủ chỗ: giãn thẻ lấp khung (có giới hạn) như trước.
+        float fit = (gridH - cellGap * (totalRows - 1)) / (float)(totalRows > 0 ? totalRows : 1);
+        if (fit > cardH) cardH = fminf(fit, 210.0f);
+    }
+
+    static int s_ctrlScrollRow = 0;
+    Rectangle gridArea = {right.x, gridTop, right.width, gridH};
+    if (totalRows > visibleRows && CheckCollisionPointRec(UiMouse(), gridArea)) {
+        float wheel = GetMouseWheelMove();
+        if (wheel != 0.0f) s_ctrlScrollRow -= (int)wheel;
+    }
+
+    // Đăng ký focus cho MỌI thẻ theo đúng vị trí của nó trên lưới (thẻ khuất
+    // nằm tiếp phía trên/dưới khung). Nhờ vậy điều hướng không gian bằng mũi tên
+    // đi được tới cả thẻ đang bị cuộn khuất, rồi lưới tự cuộn theo.
+    int focusIds[BOOT_MAX_GAMES];
+    int focusedGame = -1;
+    for (int i = 0; i < count && i < BOOT_MAX_GAMES; i++) {
+        int row = i / cols - s_ctrlScrollRow;
+        Rectangle rec = {right.x + UI_PAD_LG + (i % cols) * (cardW + cellGap),
+                         gridTop + row * (cardH + cellGap), cardW, cardH};
+        bool shown = (row >= 0 && row < visibleRows);
+        focusIds[i] = UiFocusRegister(rec, shown ? UI_FOCUS_FLAG_NONE : UI_FOCUS_NO_MOUSE);
+        if (UiFocusIsFocused(focusIds[i])) focusedGame = i;
+    }
+
+    // Kéo vào tầm nhìn: thẻ vừa nhận focus (phím mũi tên) hoặc game vừa được
+    // chọn (phím số / từ thư viện). Chỉ làm khi chúng ĐỔI, để con lăn chuột
+    // vẫn cuộn tự do được.
+    static int s_lastFocusGame = -1;
+    static int s_lastSelGame = -1;
+    int follow = -1;
+    if (focusedGame >= 0 && focusedGame != s_lastFocusGame) follow = focusedGame;
+    else if (ctx->gameIndex != s_lastSelGame) follow = ctx->gameIndex;
+    s_lastFocusGame = focusedGame;
+    s_lastSelGame = ctx->gameIndex;
+    if (follow >= 0) {
+        int followRow = follow / cols;
+        if (followRow < s_ctrlScrollRow) s_ctrlScrollRow = followRow;
+        if (followRow >= s_ctrlScrollRow + visibleRows) s_ctrlScrollRow = followRow - visibleRows + 1;
+    }
+    int maxScroll = totalRows - visibleRows;
+    if (s_ctrlScrollRow > maxScroll) s_ctrlScrollRow = maxScroll;
+    if (s_ctrlScrollRow < 0) s_ctrlScrollRow = 0;
+
+    int first = s_ctrlScrollRow * cols;
+    int last = (s_ctrlScrollRow + visibleRows) * cols;
+    for (int i = first; i < count && i < last && i < BOOT_MAX_GAMES; i++) {
         const GameEntry *game = GameRegistryGet(i);
         if (!game) continue;
 
         int col = i % cols;
-        int row = i / cols;
+        int row = i / cols - s_ctrlScrollRow;
         Rectangle card = {right.x + UI_PAD_LG + col * (cardW + cellGap),
                           gridTop + row * (cardH + cellGap), cardW, cardH};
-        DrawGameControlCard(ctx, card, game, i == ctx->gameIndex);
+        DrawGameControlCard(ctx, card, game, i == ctx->gameIndex, focusIds[i]);
+    }
+
+    // Gợi ý còn game bị khuất, đặt cùng hàng với dòng phụ đề để không chiếm chỗ của thẻ.
+    if (totalRows > visibleRows) {
+        int above = first;
+        int below = count - (last < count ? last : count);
+        char more[96];
+        if (above > 0 && below > 0) snprintf(more, sizeof(more), "↑ %d · ↓ %d game · phím mũi tên / cuộn chuột", above, below);
+        else if (below > 0)         snprintf(more, sizeof(more), "Còn %d game bên dưới · phím ↓ / cuộn chuột", below);
+        else                        snprintf(more, sizeof(more), "Còn %d game bên trên · phím ↑ / cuộn chuột", above);
+        float mw = UiTextWidth(more, UI_FS_SMALL, false);
+        UiText(more, (Vector2){right.x + right.width - UI_PAD_LG - mw, right.y + UI_PAD_LG + 30.0f},
+               UI_FS_SMALL, UiAlpha(ctx->accent, 0.95f));
     }
 }
 
@@ -405,7 +483,7 @@ void HubSettingsPageDraw(HubContext *ctx, Rectangle area)
     // 4. Hiển thị FPS
     {
         SettingRowLayout r = SettingRow(panel, y, rowH, UiIconCounter, "Hiện chỉ số FPS",
-                                        "Thêm số khung hình vào thanh trạng thái", ctx->accent);
+                                        "Hiện số khung hình ở Hub và khi chơi (F3)", ctx->accent);
         Rectangle tog = {r.slot.x + r.slot.width - 58.0f, r.slot.y + (r.slot.height - 30.0f) * 0.5f, 54.0f, 30.0f};
         if (UiToggleEx(tog, cfg->showFps, ctx->accent, r.focus).clicked) {
             cfg->showFps = !cfg->showFps;
@@ -486,17 +564,31 @@ void HubSettingsPageDraw(HubContext *ctx, Rectangle area)
     char line[128];
     snprintf(line, sizeof(line), "%d game · Raylib %s", GameRegistryCount(), RAYLIB_VERSION);
     UiText(line, (Vector2){about.x + UI_PAD_MD, about.y + UI_PAD_MD + 32.0f}, UI_FS_SMALL, UI.textSecondary);
-    UiText("Thống kê: game_boot_stats.txt",
+    // Kỷ lục của từng game, thống kê và cài đặt của Hub đều nằm chung một thư mục.
+    UiText("Dữ liệu (kỷ lục, thống kê, cài đặt):",
            (Vector2){about.x + UI_PAD_MD, about.y + UI_PAD_MD + 52.0f}, UI_FS_SMALL, UI.textMuted);
-    UiText("Cài đặt: game_boot_settings.txt",
-           (Vector2){about.x + UI_PAD_MD, about.y + UI_PAD_MD + 70.0f}, UI_FS_SMALL, UI.textMuted);
+    char dir[512];
+    const char *home = getenv("HOME");
+    const char *dataDir = SaveDataDir();
+    size_t homeLen = home ? strlen(home) : 0;
+    if (homeLen > 0 && strncmp(dataDir, home, homeLen) == 0) snprintf(dir, sizeof(dir), "~%s", dataDir + homeLen);
+    else                                                    snprintf(dir, sizeof(dir), "%s", dataDir);
+    // Đường dẫn quá dài (vd. ghi đè bằng RAYLIB_ARCADE_DATA): giữ phần cuối, thêm "…" ở đầu.
+    const char *shown = dir;
+    float maxW = about.width - UI_PAD_MD * 2.0f;
+    while (shown[0] && UiTextWidth(TextFormat("…%s", shown), UI_FS_SMALL, false) > maxW) {
+        shown++;
+        while (((unsigned char)shown[0] & 0xC0) == 0x80) shown++;   // Không cắt giữa ký tự UTF-8
+    }
+    if (shown != dir) shown = TextFormat("…%s", shown);
+    UiText(shown, (Vector2){about.x + UI_PAD_MD, about.y + UI_PAD_MD + 70.0f}, UI_FS_SMALL, UI.textSecondary);
 
     // Xoá toàn bộ thống kê: hành động không hoàn tác nên cần bấm xác nhận hai bước.
     static bool confirming = false;
     Rectangle btn = {side.x + UI_PAD_LG, side.y + side.height - 56.0f - UI_PAD_LG,
                      side.width - UI_PAD_LG * 2.0f, 46.0f};
 
-    const char *label = confirming ? "Bấm lần nữa để xác nhận" : "Xoá toàn bộ thống kê";
+    const char *label = confirming ? "Bấm lần nữa để xác nhận" : "Xoá toàn bộ thống kê & kỷ lục";
     if (UiGlassButton(btn, label, confirming ? UI.danger : ctx->accent, confirming, true).clicked) {
         if (confirming) {
             BootStatsResetAll();

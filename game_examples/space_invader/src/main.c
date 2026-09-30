@@ -4,6 +4,7 @@
 #include "space_types.h"
 #include "space_game.h"
 #include "space_audio.h"
+#include "save_data.h"
 #include <math.h>
 
 int main(void)
@@ -61,6 +62,7 @@ int main(void)
         EndDrawing();
     }
 
+    SaveDataSubmitBest(SPACE_SAVE_ID, "best", game.highScore);
     CloseSpaceAudio();
     if (IsAudioDeviceReady()) {
         CloseAudioDevice();

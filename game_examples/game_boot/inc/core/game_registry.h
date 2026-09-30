@@ -6,6 +6,11 @@
  *   2. Vẽ hai hàm artwork (icon nhỏ cho sidebar, tranh lớn cho hero) ở hub_art.c.
  *   3. Thêm một phần tử vào mảng trong src/core/game_registry.c.
  * Không cần sửa bất kỳ file UI nào khác.
+ *
+ * Dữ liệu lưu của game (kỷ lục...) nằm ở common/save_data, trong file
+ * "<id>.txt" của thư mục dữ liệu chung - nên `id` ở đây phải trùng với id
+ * mà game dùng khi gọi SaveData*. Hub đọc khoá "best" để hiển thị kỷ lục và
+ * xoá đúng file đó khi người dùng bấm xoá dữ liệu.
  */
 #ifndef GAME_REGISTRY_H
 #define GAME_REGISTRY_H
@@ -38,6 +43,8 @@ typedef struct {
     const char *controls[GAME_MAX_CONTROLS];
     int controlCount;
 
+    const char *recordLabel;   // Nhãn của khoá "best" (vd "Kỷ lục"); NULL nếu game không lưu điểm
+
     int canvasWidth;           // Độ phân giải ảo riêng của game
     int canvasHeight;
 
@@ -51,6 +58,10 @@ typedef struct {
     GameUpdateFn update;
     GameDrawFn   draw;
     GameCloseFn  close;
+
+    // Tuỳ chọn: chuyển file lưu kiểu cũ sang thư mục dữ liệu chung. Hub gọi lúc
+    // khởi động để hiện đúng kỷ lục ngay cả khi game chưa được mở lần nào.
+    GameInitFn   migrateSave;
 } GameEntry;
 
 int              GameRegistryCount(void);

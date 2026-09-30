@@ -32,6 +32,7 @@ typedef enum {
     BOOT_ACTION_HOME,         // F1 / Home: thoát game về Hub
     BOOT_ACTION_FULLSCREEN,   // F11
     BOOT_ACTION_SCREENSHOT,   // F12
+    BOOT_ACTION_TOGGLE_FPS,   // F3: bật/tắt bộ đếm FPS (cả trong Hub lẫn khi đang chơi)
 
     BOOT_ACTION_COUNT
 } BootAction;

@@ -4,6 +4,7 @@
 #include "tetris_types.h"
 #include "tetris_game.h"
 #include "tetris_audio.h"
+#include "save_data.h"
 #include <math.h>
 
 int main(void)
@@ -61,6 +62,7 @@ int main(void)
         EndDrawing();
     }
 
+    SaveDataSubmitBest(TETRIS_SAVE_ID, "best", game.highScore);
     CloseTetrisAudio();
     if (IsAudioDeviceReady()) {
         CloseAudioDevice();

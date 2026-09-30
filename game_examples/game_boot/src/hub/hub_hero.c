@@ -154,7 +154,7 @@ void HubHeroDrawOverlay(HubContext *ctx, Rectangle area)
     Rectangle play = {area.x + HERO_PAD_X, area.y + area.height - PLAY_HEIGHT - 48.0f, PLAY_WIDTH, PLAY_HEIGHT};
     Rectangle menuBtn = {play.x + play.width + UI_PAD_SM, play.y, PLAY_HEIGHT, PLAY_HEIGHT};
 
-    const char *items[2] = {"Xem bảng phím điều khiển", "Xoá thống kê của game này"};
+    const char *items[2] = {"Xem bảng phím điều khiển", "Xoá thống kê & kỷ lục game này"};
     float itemH = 40.0f;
     Rectangle menu = {menuBtn.x, menuBtn.y + menuBtn.height + UI_PAD_XS, MENU_WIDTH,
                       itemH * 2.0f + UI_PAD_XS * 2.0f};

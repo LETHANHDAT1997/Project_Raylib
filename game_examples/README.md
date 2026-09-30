@@ -1,6 +1,6 @@
 # 🎮 Raylib Game Examples & Arcade Master Hub
 
-Tuyển tập 4 trò chơi cổ điển được xây dựng bằng **C** và thư viện đồ họa **Raylib**, tích hợp kiến trúc **Virtual Canvas tự động thích ứng với mọi độ phân giải màn hình (HD, Full HD, 2K, 4K, Fullscreen)** và trình khởi động trung tâm **`game_boot` (Arcade Hub)** với giao diện **Liquid Glass**.
+Tuyển tập 5 trò chơi cổ điển được xây dựng bằng **C** và thư viện đồ họa **Raylib**, tích hợp kiến trúc **Virtual Canvas tự động thích ứng với mọi độ phân giải màn hình (HD, Full HD, 2K, 4K, Fullscreen)** và trình khởi động trung tâm **`game_boot` (Arcade Hub)** với giao diện **Liquid Glass**.
 
 ---
 
@@ -64,7 +64,14 @@ game_examples/
 │   ├── inc/                    # snake_types.h, snake_game.h, snake_runner.h, ...
 │   └── src/                    # main.c, snake_game.c, snake_runner.c, ...
 │
-├── fighter/                    # Game 4: Đấu Sĩ - đối kháng 2D (1280x720, C++17 OOP)
+├── flappy/                     # Game 4: Flappy Plane - vỗ cánh né mỏm đá (1280x768)
+│   ├── CMakeLists.txt          # CMake độc lập cho Flappy Plane
+│   ├── build_and_run.sh        # Script build và chạy Flappy Plane độc lập
+│   ├── README.md               # Luật chơi, cơ chế và cách thêm máy bay / vùng địa hình
+│   ├── inc/                    # flappy_types.h, flappy_world.h, flappy_draw.h, flappy_runner.h, ...
+│   └── src/                    # main.c, flappy_game.c, flappy_world.c, flappy_draw.c, ...
+│
+├── fighter/                    # Game 5: Đấu Sĩ - đối kháng 2D (1280x720, C++17 OOP)
 │   ├── CMakeLists.txt          # CMake độc lập cho Fighter
 │   ├── README.md               # Kiến trúc OOP & cách thêm nhân vật mới
 │   ├── inc/
@@ -83,6 +90,7 @@ game_examples/
 └── assets/
     ├── fonts/                  # dejavu.ttf, dejavu_bold.ttf
     ├── wallpapers/             # Ảnh nền của Hub - thả thêm file vào đây là xong
+    ├── flappy/                 # Sprite + âm thanh Kenney của Flappy Plane (CC0, xem LICENSES.md)
     └── fighter/                # Sprite của game Đấu Sĩ (giấy phép CC0, xem LICENSES.md)
         ├── characters/<id>/    # 8 file: idle, run, jump, fall, attack1, attack2, takehit, death
         └── backgrounds/        # Các lớp ảnh parallax của sân đấu
@@ -98,7 +106,7 @@ game_examples/
    * Canvas ảo được tự động phóng to/thu nhỏ (Scale) tỷ lệ chuẩn lên bất kỳ màn hình nào (kể cả 2K, 4K hay kéo góc cửa sổ tự do) với viền đen cân đối (*Letterbox*), không bao giờ bị méo hình.
    * Tọa độ chuột được tự động chuyển đổi qua `SetMouseOffset` và `SetMouseScale`, giúp các nút bấm giao diện luôn nhấp chuột chuẩn xác trên mọi kích thước cửa sổ.
 2. **Cơ chế Macro `IS_BUILD_ALL`**:
-   * Khi build riêng lẻ từng thư mục con (`tetris/`, `space_invader/`, `snake/`): Macro `IS_BUILD_ALL` không bật, file `main.c` của game đó được biên dịch thành file thực thi độc lập (đã tích hợp sẵn Virtual Canvas).
+   * Khi build riêng lẻ từng thư mục con (`tetris/`, `space_invader/`, `snake/`, `flappy/`): Macro `IS_BUILD_ALL` không bật, file `main.c` của game đó được biên dịch thành file thực thi độc lập (đã tích hợp sẵn Virtual Canvas).
    * Khi build qua `game_boot`: Macro `-DIS_BUILD_ALL` được bật, các file `main.c` con sẽ tự động bỏ qua hàm `main()`, thay vào đó `game_boot` điều phối game thông qua các giao diện Runner (`Init...App`, `Update...App`, `Draw...App`, `Close...App`).
 
 ---
@@ -233,6 +241,8 @@ Danh mục game là *data-driven*, nên không phải sửa bất kỳ file giao
 2. Vẽ hai hàm artwork trong `game_boot/src/hub/hub_art.c`: một icon vuông cho sidebar và một tranh lớn cho hero (khai báo trong `hub_art.h`).
 3. Thêm một phần tử vào mảng `s_games[]` trong `game_boot/src/core/game_registry.c`: tên, mô tả, thẻ thể loại, danh sách phím, độ phân giải, màu chủ đạo và con trỏ tới các hàm ở bước 1–2.
 4. Thêm thư mục game vào `game_boot/CMakeLists.txt` (`file(GLOB ...)` và `target_include_directories`).
+5. Nếu game có kỷ lục: lưu bằng `SaveDataSubmitBest("<id>", "best", diem)` trong `common/save_data.h`
+   (với `<id>` trùng `.id` trong registry) và đặt `.recordLabel = "Kỷ lục"` - Hub tự hiển thị và tự xoá được.
 
 Sidebar, hero, thẻ thông tin, trang Điều khiển và thống kê thời gian chơi sẽ tự động nhận game mới.
 
@@ -240,14 +250,35 @@ Sidebar, hero, thẻ thông tin, trang Điều khiển và thống kê thời gi
 
 ## 💾 Dữ Liệu Lưu Trên Đĩa
 
-Arcade Hub ghi hai file văn bản ngay tại thư mục chạy:
+Mọi dữ liệu cần giữ qua các lần chạy - của Hub lẫn của từng game - nằm trong **một thư mục cố định
+theo người dùng**, không phụ thuộc bạn chạy game từ thư mục nào (module `common/save_data.h`):
+
+| Hệ điều hành | Thư mục dữ liệu |
+| --- | --- |
+| Linux | `$XDG_DATA_HOME/raylib-arcade/` (mặc định `~/.local/share/raylib-arcade/`) |
+| macOS | `~/Library/Application Support/RaylibArcade/` |
+| Windows | `%APPDATA%\RaylibArcade\` |
+| Tuỳ chỉnh | đặt biến môi trường `RAYLIB_ARCADE_DATA=<thư mục>` |
+
+Đường dẫn thực tế hiển thị trong trang **Cài đặt** của Hub.
 
 | File | Nội dung |
 | --- | --- |
 | `game_boot_stats.txt` | Thời gian chơi, phiên gần nhất và số lần khởi động của từng game |
-| `game_boot_settings.txt` | Chất lượng hiệu ứng kính, âm lượng, hiện FPS, giảm chuyển động |
+| `game_boot_settings.txt` | Hiệu ứng kính, âm lượng, hiện FPS, giảm chuyển động, hình nền |
+| `<id game>.txt` | Dữ liệu riêng của game, mỗi dòng `khoá giá_trị` (vd. `snake.txt`, `flappy.txt`) |
 
-Cả hai đều ở dạng khoá-giá trị theo `id` game, nên thêm hoặc bớt game không làm hỏng dữ liệu cũ. Có thể xoá sạch thống kê ngay trong trang **Cài đặt**.
+Quy ước: khoá `best` là kỷ lục tổng của game - Hub đọc khoá này để hiện dòng **Kỷ lục** trong thẻ
+"Thông tin game". Game có thể lưu thêm khoá khác (Flappy lưu `best.easy`, `best.normal`, `best.hard`).
+Tên file trùng với `id` của game trong `game_registry.c`, nên khi bấm **Xoá thống kê & kỷ lục game này**
+(menu `···` cạnh nút Chơi) hoặc **Xoá toàn bộ thống kê & kỷ lục** (trang Cài đặt), Hub biết chính xác
+file nào cần xoá. Đấu Sĩ hiện chưa lưu điểm nên chỉ có thống kê thời gian chơi.
+
+Bản cũ ghi các file `game_boot_*.txt`, `snake_highscore.dat`, `flappy_highscore.dat` ngay tại thư mục
+đang chạy. Lần khởi động đầu tiên, Hub tự chuyển chúng sang thư mục mới rồi đổi tên file cũ thành
+`*.migrated` (để không bị nhập lại sau khi xoá dữ liệu) - có thể xoá các file `.migrated` đó.
+
+Các file của Hub đều ở dạng khoá-giá trị theo `id` game, nên thêm hoặc bớt game không làm hỏng dữ liệu cũ. Có thể xoá sạch thống kê ngay trong trang **Cài đặt**.
 
 ---
 
@@ -273,7 +304,13 @@ cd game_examples/snake
 ./build_and_run.sh
 ```
 
-### 4. Game Đấu Sĩ (Fighter)
+### 4. Game Flappy Plane
+```bash
+cd game_examples/flappy
+./build_and_run.sh
+```
+
+### 5. Game Đấu Sĩ (Fighter)
 ```bash
 cd game_examples/fighter
 ./build_and_run.sh
@@ -290,9 +327,10 @@ cd game_examples
 ./build_all.sh
 ```
 
-Tất cả 4 file thực thi sẽ được tạo sẵn trong thư mục `build/`:
+Tất cả các file thực thi sẽ được tạo sẵn trong thư mục `build/`:
 * `./build/game_boot/game_boot` *(Arcade Hub)*
 * `./build/tetris/tetris`
 * `./build/space_invader/space_invader`
 * `./build/snake/snake`
+* `./build/flappy/flappy`
 * `./build/fighter/fighter`

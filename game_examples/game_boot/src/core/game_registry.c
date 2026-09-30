@@ -4,6 +4,7 @@
 #include "tetris_runner.h"
 #include "space_runner.h"
 #include "snake_runner.h"
+#include "flappy_runner.h"
 #include "fighter_runner.h"
 
 #include <string.h>
@@ -30,6 +31,7 @@ static const GameEntry s_games[] = {
             "P  Tạm dừng"
         },
         .controlCount = 6,
+        .recordLabel = "Kỷ lục",
         .canvasWidth = 780,
         .canvasHeight = 740,
         .accent     = (Color){126, 196, 255, 255},
@@ -56,6 +58,7 @@ static const GameEntry s_games[] = {
             "R  Chơi lại"
         },
         .controlCount = 4,
+        .recordLabel = "Kỷ lục",
         .canvasWidth = 800,
         .canvasHeight = 880,
         .accent     = (Color){122, 232, 176, 255},
@@ -82,6 +85,7 @@ static const GameEntry s_games[] = {
             "R  Chơi lại"
         },
         .controlCount = 4,
+        .recordLabel = "Kỷ lục",
         .canvasWidth = 960,
         .canvasHeight = 720,
         .accent     = (Color){148, 226, 136, 255},
@@ -89,7 +93,39 @@ static const GameEntry s_games[] = {
         .drawIcon = HubArtSnakeIcon,
         .drawHeroArt = HubArtSnakeHero,
         .init = InitSnakeApp, .update = UpdateSnakeApp,
-        .draw = DrawSnakeApp, .close = CloseSnakeApp
+        .draw = DrawSnakeApp, .close = CloseSnakeApp,
+        .migrateSave = MigrateSnakeSave
+    },
+    {
+        .id = "flappy",
+        .title = "Flappy Plane",
+        .platform = "PC · Raylib",
+        .tagline = "Vỗ cánh luồn qua khe giữa những mỏm đá nhọn, nhặt sao thưởng "
+                   "và băng qua năm vùng địa hình để giành huy chương vàng.",
+        .developer = "Raylib Arcade",
+        .releaseDate = "Bản dựng 2026",
+        .engine = "Raylib 6.x",
+        .tags = {"Một chạm", "Phản xạ", "Điểm cao"},
+        .tagCount = 3,
+        .controls = {
+            "Space / ↑ / Click  Vỗ cánh",
+            "← →  Chọn máy bay (menu)",
+            "↑ ↓ / 1-3  Độ khó (menu)",
+            "P / Esc  Tạm dừng",
+            "R  Chơi lại · Q  Về menu",
+            "M  Bật / tắt âm thanh"
+        },
+        .controlCount = 6,
+        .recordLabel = "Kỷ lục",
+        .canvasWidth = 1280,
+        .canvasHeight = 768,
+        .accent     = (Color){255, 206, 92, 255},
+        .accentDeep = (Color){206, 128, 36, 255},
+        .drawIcon = HubArtFlappyIcon,
+        .drawHeroArt = HubArtFlappyHero,
+        .init = InitFlappyApp, .update = UpdateFlappyApp,
+        .draw = DrawFlappyApp, .close = CloseFlappyApp,
+        .migrateSave = MigrateFlappySave
     },
     {
         .id = "fighter",

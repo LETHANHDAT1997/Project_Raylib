@@ -2,6 +2,7 @@
 #include "snake_entities.h"
 #include "snake_audio.h"
 #include "font_vn.h"
+#include "save_data.h"
 #include "raymath.h"
 #include <stdio.h>
 #include <math.h>
@@ -9,27 +10,35 @@
 #define DrawText DrawTextVN
 #define MeasureText MeasureTextVN
 
-static const char *HIGH_SCORE_FILE = "snake_highscore.dat";
+// Khoá lưu dữ liệu (common/save_data) - phải trùng id của game trong Arcade Hub.
+#define SNAKE_SAVE_ID "snake"
+
+// Bản cũ ghi một số int nhị phân vào thư mục đang chạy game.
+static void ImportLegacyHighScore(const char *path)
+{
+    FILE *f = fopen(path, "rb");
+    if (!f) return;
+    int score = 0;
+    if (fread(&score, sizeof(int), 1, f) == 1) {
+        SaveDataSubmitBest(SNAKE_SAVE_ID, "best", score);
+    }
+    fclose(f);
+}
+
+void MigrateSnakeSave(void)
+{
+    SaveDataMigrateLegacy("snake_highscore.dat", ImportLegacyHighScore);
+}
 
 static int LoadHighScoreFromFile(void)
 {
-    FILE *f = fopen(HIGH_SCORE_FILE, "rb");
-    if (!f) return 0;
-    int score = 0;
-    if (fread(&score, sizeof(int), 1, f) != 1) {
-        score = 0;
-    }
-    fclose(f);
-    return score;
+    MigrateSnakeSave();
+    return SaveDataGetInt(SNAKE_SAVE_ID, "best", 0);
 }
 
 static void SaveHighScoreToFile(int score)
 {
-    FILE *f = fopen(HIGH_SCORE_FILE, "wb");
-    if (f) {
-        fwrite(&score, sizeof(int), 1, f);
-        fclose(f);
-    }
+    SaveDataSubmitBest(SNAKE_SAVE_ID, "best", score);
 }
 
 void InitSnakeGame(SnakeGame *game)
@@ -292,22 +301,22 @@ static void DrawSidebar(const SnakeGame *game)
     DrawRectangleRounded(p2, 0.12f, 8, (Color){26, 36, 52, 220});
     DrawRectangleRoundedLinesEx(p2, 0.12f, 8, 1.5f, (Color){51, 65, 85, 255});
 
-    DrawText("CHỈ SỐ CHƠI", startX + 16, 207, 13, (Color){148, 163, 184, 255});
+    DrawText("CHỈ SỐ CHƠI", startX + 16, 207, 13, (Color){148, 163, 184, 255});
 
     // Độ dài thân
-    DrawText("Độ dài rắn:", startX + 16, 230, 14, (Color){203, 213, 225, 255});
+    DrawText("Độ dài rắn:", startX + 16, 230, 14, (Color){203, 213, 225, 255});
     char lenStr[16];
     snprintf(lenStr, sizeof(lenStr), "%d", game->snake.length);
     DrawText(lenStr, startX + width - 16 - MeasureText(lenStr, 14), 230, 14, (Color){52, 211, 153, 255});
 
     // Số táo đỏ
-    DrawText("Táo đỏ:", startX + 16, 255, 14, (Color){203, 213, 225, 255});
+    DrawText("Táo đỏ:", startX + 16, 255, 14, (Color){203, 213, 225, 255});
     char appleStr[16];
     snprintf(appleStr, sizeof(appleStr), "%d", game->applesEaten);
     DrawText(appleStr, startX + width - 16 - MeasureText(appleStr, 14), 255, 14, (Color){248, 113, 113, 255});
 
     // Số táo vàng
-    DrawText("Táo vàng:", startX + 16, 280, 14, (Color){203, 213, 225, 255});
+    DrawText("Táo vàng:", startX + 16, 280, 14, (Color){203, 213, 225, 255});
     char goldStr[16];
     snprintf(goldStr, sizeof(goldStr), "%d", game->goldenEaten);
     DrawText(goldStr, startX + width - 16 - MeasureText(goldStr, 14), 280, 14, (Color){251, 191, 36, 255});
@@ -343,7 +352,7 @@ static void DrawSidebar(const SnakeGame *game)
     Color modeCol = (game->mode == MODE_CLASSIC) ? (Color){239, 68, 68, 255} : (Color){14, 165, 233, 255};
     DrawText(modeStr, startX + 16, 417, 13, modeCol);
 
-    const char *diffStr = "Bình thường";
+    const char *diffStr = "Bình thường";
     if (game->difficulty == DIFF_FAST) diffStr = "Nhanh";
     else if (game->difficulty == DIFF_INSANE) diffStr = "Điên cuồng";
 

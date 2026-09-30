@@ -1,6 +1,7 @@
 #include "font_vn.h"
 #include <stddef.h>
 #include <stdbool.h>
+#include <stdio.h>
 #include <string.h>
 
 static Font s_fontVN = {0};
@@ -24,20 +25,31 @@ static const char *FindFontPath(const char *fontName)
 {
     static char pathBuffer[256];
 
-    const char *candidates[8];
-    candidates[0] = TextFormat("assets/fonts/%s", fontName);
-    candidates[1] = TextFormat("../assets/fonts/%s", fontName);
-    candidates[2] = TextFormat("../../assets/fonts/%s", fontName);
-    candidates[3] = TextFormat("../../game_examples/assets/fonts/%s", fontName);
-    candidates[4] = TextFormat("/usr/share/fonts/truetype/dejavu/%s", strcmp(fontName, "dejavu_bold.ttf") == 0 ? "DejaVuSans-Bold.ttf" : "DejaVuSans.ttf");
-    candidates[5] = "/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf";
-    candidates[6] = "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf";
-    candidates[7] = NULL;
+    // KHÔNG dùng TextFormat() cho danh sách này: TextFormat chỉ có 4 buffer
+    // xoay vòng (MAX_TEXTFORMAT_BUFFERS), lần gọi thứ 5 ghi đè lên chuỗi của
+    // candidates[0] -> "assets/fonts/..." bị mất. Trên PC lỗi bị che vì máy có
+    // sẵn DejaVu ở /usr/share/fonts; trên Raspberry Pi thì rơi về font mặc định
+    // của raylib (chỉ có ASCII) và mất toàn bộ chữ có dấu.
+    static const char *relativeDirs[] = {
+        "assets/fonts/",
+        "../assets/fonts/",
+        "../../assets/fonts/",
+        "../../game_examples/assets/fonts/",
+    };
+    const char *systemFonts[] = {
+        strcmp(fontName, "dejavu_bold.ttf") == 0 ? "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+                                                 : "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        "/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf",
+        "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+    };
 
-    for (int i = 0; candidates[i] != NULL; i++) {
-        if (FileExists(candidates[i])) {
-            strncpy(pathBuffer, candidates[i], sizeof(pathBuffer) - 1);
-            pathBuffer[sizeof(pathBuffer) - 1] = '\0';
+    for (size_t i = 0; i < sizeof(relativeDirs) / sizeof(relativeDirs[0]); i++) {
+        snprintf(pathBuffer, sizeof(pathBuffer), "%s%s", relativeDirs[i], fontName);
+        if (FileExists(pathBuffer)) return pathBuffer;
+    }
+    for (size_t i = 0; i < sizeof(systemFonts) / sizeof(systemFonts[0]); i++) {
+        if (FileExists(systemFonts[i])) {
+            snprintf(pathBuffer, sizeof(pathBuffer), "%s", systemFonts[i]);
             return pathBuffer;
         }
     }

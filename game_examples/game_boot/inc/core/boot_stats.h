@@ -19,8 +19,13 @@ typedef struct {
 void             BootStatsLoad(void);
 void             BootStatsSave(void);
 const GameStats *BootStatsGet(int gameIndex);
+// Xoá thống kê chơi CỦA HUB và cả dữ liệu lưu CỦA GAME (file "<id>.txt" trong
+// thư mục dữ liệu chung, xem common/save_data.h).
 void             BootStatsReset(int gameIndex);
 void             BootStatsResetAll(void);
+
+// Kỷ lục đã lưu của game (khoá "best"); trả về false nếu game chưa có kỷ lục.
+bool             BootStatsGetRecord(int gameIndex, int *outValue);
 
 // Đo thời lượng phiên chơi: gọi Begin khi vào game, End khi thoát ra Hub.
 void   BootStatsBeginSession(int gameIndex);

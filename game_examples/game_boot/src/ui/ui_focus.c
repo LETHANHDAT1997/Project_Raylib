@@ -65,7 +65,7 @@ int UiFocusRegister(Rectangle rec, UiFocusFlags flags)
 
     // Bấm chuột vào đâu thì focus nhảy về đó, để sau đó dùng tiếp bàn phím
     // là đi tiếp từ chính chỗ vừa bấm.
-    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) &&
+    if (!(flags & UI_FOCUS_NO_MOUSE) && IsMouseButtonPressed(MOUSE_BUTTON_LEFT) &&
         CheckCollisionPointRec(GetMousePosition(), rec)) {
         s_focused = id;
         s_ringVisible = false;

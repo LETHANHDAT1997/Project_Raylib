@@ -11,14 +11,14 @@
 #define GLASS_BLUR_DIV 4
 
 typedef struct {
-    int quadPos, quadSize, resolution, rectCenter, rectHalf, radius;
+    int quadPos, quadSize, resolution, rectCenter, rectHalf, radius, pixelScale;
     int tint, refraction, edgeWidth, highlight, innerShadow, alpha;
     int targetLum, level, saturation;
     int sampleMode, flipY;
 } PanelLocs;
 
 typedef struct {
-    int quadPos, quadSize, rectCenter, rectHalf, radius, thickness, spread, mode, color;
+    int quadPos, quadSize, rectCenter, rectHalf, radius, pixelScale, thickness, spread, mode, color;
 } StrokeLocs;
 
 static struct {
@@ -96,6 +96,7 @@ static void CachePanelLocs(void)
     G.panelLoc.rectCenter  = GetShaderLocation(s, "uRectCenter");
     G.panelLoc.rectHalf    = GetShaderLocation(s, "uRectHalf");
     G.panelLoc.radius      = GetShaderLocation(s, "uRadius");
+    G.panelLoc.pixelScale  = GetShaderLocation(s, "uPixelScale");
     G.panelLoc.tint        = GetShaderLocation(s, "uTint");
     G.panelLoc.refraction  = GetShaderLocation(s, "uRefraction");
     G.panelLoc.edgeWidth   = GetShaderLocation(s, "uEdgeWidth");
@@ -117,6 +118,7 @@ static void CacheStrokeLocs(void)
     G.strokeLoc.rectCenter = GetShaderLocation(s, "uRectCenter");
     G.strokeLoc.rectHalf   = GetShaderLocation(s, "uRectHalf");
     G.strokeLoc.radius     = GetShaderLocation(s, "uRadius");
+    G.strokeLoc.pixelScale = GetShaderLocation(s, "uPixelScale");
     G.strokeLoc.thickness  = GetShaderLocation(s, "uThickness");
     G.strokeLoc.spread     = GetShaderLocation(s, "uSpread");
     G.strokeLoc.mode       = GetShaderLocation(s, "uMode");
@@ -363,6 +365,17 @@ static void DrawFallbackPanel(Rectangle rec, float radius, UiGlassStyle style)
     DrawRectangleRoundedLinesEx(rec, roundness, 12, 1.2f, UiAlpha(UI.strokeSoft, style.highlight));
 }
 
+// Số pixel màn hình ứng với 1 đơn vị toạ độ giao diện, đọc từ ma trận đang áp
+// dụng (Hub vẽ ở 1280x720 rồi rlScalef theo cửa sổ). GPU không có dFdx/dFdy
+// (vd. VC4 của Raspberry Pi 0-3) cần số này để bề rộng khử răng cưa bằng đúng
+// fwidth() - không thì mép răng cưa khi thu nhỏ và nhoè khi phóng to.
+static float CurrentPixelScale(void)
+{
+    Matrix m = rlGetMatrixTransform();
+    float s = sqrtf(m.m0 * m.m0 + m.m1 * m.m1);
+    return (s > 0.0001f) ? s : 1.0f;
+}
+
 static void SetPanelUniforms(Rectangle quad, Rectangle rec, float radius,
                              UiGlassStyle style, int sampleMode, int flipY)
 {
@@ -374,6 +387,7 @@ static void SetPanelUniforms(Rectangle quad, Rectangle rec, float radius,
 
     Vector4 tint = ColorToVec4(style.tint);
     tint.w = style.tintStrength;
+    float pixelScale = CurrentPixelScale();
 
     Shader s = G.panelShader;
     SetShaderValue(s, G.panelLoc.quadPos,     &quadPos,  SHADER_UNIFORM_VEC2);
@@ -382,6 +396,7 @@ static void SetPanelUniforms(Rectangle quad, Rectangle rec, float radius,
     SetShaderValue(s, G.panelLoc.rectCenter,  &center,   SHADER_UNIFORM_VEC2);
     SetShaderValue(s, G.panelLoc.rectHalf,    &half,     SHADER_UNIFORM_VEC2);
     SetShaderValue(s, G.panelLoc.radius,      &radius,   SHADER_UNIFORM_FLOAT);
+    SetShaderValue(s, G.panelLoc.pixelScale,  &pixelScale, SHADER_UNIFORM_FLOAT);
     SetShaderValue(s, G.panelLoc.tint,        &tint,     SHADER_UNIFORM_VEC4);
     SetShaderValue(s, G.panelLoc.refraction,  &style.refraction,  SHADER_UNIFORM_FLOAT);
     SetShaderValue(s, G.panelLoc.edgeWidth,   &style.edgeWidth,   SHADER_UNIFORM_FLOAT);
@@ -448,6 +463,7 @@ static void DrawStrokeQuad(Rectangle rec, float radius, float thickness,
     Vector2 center   = {rec.x + rec.width * 0.5f, rec.y + rec.height * 0.5f};
     Vector2 half     = {rec.width * 0.5f, rec.height * 0.5f};
     Vector4 col      = ColorToVec4(color);
+    float pixelScale = CurrentPixelScale();
 
     Shader s = G.strokeShader;
     BeginShaderMode(s);
@@ -456,6 +472,7 @@ static void DrawStrokeQuad(Rectangle rec, float radius, float thickness,
         SetShaderValue(s, G.strokeLoc.rectCenter, &center,    SHADER_UNIFORM_VEC2);
         SetShaderValue(s, G.strokeLoc.rectHalf,   &half,      SHADER_UNIFORM_VEC2);
         SetShaderValue(s, G.strokeLoc.radius,     &radius,    SHADER_UNIFORM_FLOAT);
+        SetShaderValue(s, G.strokeLoc.pixelScale, &pixelScale, SHADER_UNIFORM_FLOAT);
         SetShaderValue(s, G.strokeLoc.thickness,  &thickness, SHADER_UNIFORM_FLOAT);
         SetShaderValue(s, G.strokeLoc.spread,     &spread,    SHADER_UNIFORM_FLOAT);
         SetShaderValue(s, G.strokeLoc.mode,       &mode,      SHADER_UNIFORM_INT);

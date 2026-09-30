@@ -14,28 +14,36 @@
 
 static const char *UI_GLASS_GLSL_330 =
 "#version 330\n"
+"#define GLASS_HAS_DERIVATIVES\n"
 "#define VARYING in\n"
 "out vec4 finalColor;\n";
 
 static const char *UI_GLASS_GLSL_120 =
 "#version 120\n"
+"#define GLASS_HAS_DERIVATIVES\n"
 "#define VARYING varying\n"
 "#define texture texture2D\n"
 "#define finalColor gl_FragColor\n";
 
 static const char *UI_GLASS_GLSL_300ES =
 "#version 300 es\n"
+"#define GLASS_HAS_DERIVATIVES\n"
 "precision highp float;\n"
 "#define VARYING in\n"
 "out vec4 finalColor;\n";
 
-// GLES2 cần extension cho fwidth/dFdx/dFdy. GPU không có extension này thì
-// shader không biên dịch và giao diện tự lùi về đường vẽ dự phòng.
+// GLES2 chỉ có fwidth/dFdx/dFdy khi GPU hỗ trợ GL_OES_standard_derivatives.
+// VC4 của Raspberry Pi 0-3 (Mesa vc4) KHÔNG có extension này, nên chỉ bật khi
+// có và báo cho thân shader qua GLASS_HAS_DERIVATIVES; không có thì thân
+// shader tự tính gradient SDF bằng sai phân (sdRoundBoxGrad).
 // Toạ độ pixel cỡ 1000+ cần highp: mediump chỉ đủ sai số ~1px ở đó, mép
 // SDF sẽ răng cưa và khúc xạ bị nhoè.
 static const char *UI_GLASS_GLSL_100 =
 "#version 100\n"
+"#ifdef GL_OES_standard_derivatives\n"
 "#extension GL_OES_standard_derivatives : enable\n"
+"#define GLASS_HAS_DERIVATIVES\n"
+"#endif\n"
 "#ifdef GL_FRAGMENT_PRECISION_HIGH\n"
 "precision highp float;\n"
 "#else\n"
@@ -79,6 +87,7 @@ static const char *UI_GLASS_PANEL_FS =
 "uniform vec2  uRectCenter;\n"   // Tâm tấm kính (pixel)
 "uniform vec2  uRectHalf;\n"     // Nửa kích thước tấm kính (pixel)
 "uniform float uRadius;\n"
+"uniform float uPixelScale;\n"   // Pixel màn hình / đơn vị toạ độ (chỉ dùng khi không có dFdx/dFdy)
 "uniform vec4  uTint;\n"         // rgb = màu phủ, a = cường độ phủ
 "uniform float uRefraction;\n"
 "uniform float uEdgeWidth;\n"
@@ -98,6 +107,13 @@ static const char *UI_GLASS_PANEL_FS =
 "    return min(max(q.x, q.y), 0.0) + length(max(q, 0.0)) - r;\n"
 "}\n"
 "\n"
+"vec2 sdRoundBoxGrad(vec2 p, vec2 b, float r)\n"   // Đạo hàm SDF theo 1 pixel canvas, dùng khi không có dFdx/dFdy
+"{\n"
+"    vec2 e = vec2(0.5, 0.0);\n"
+"    return vec2(sdRoundBox(p + e.xy, b, r) - sdRoundBox(p - e.xy, b, r),\n"
+"                sdRoundBox(p + e.yx, b, r) - sdRoundBox(p - e.yx, b, r));\n"
+"}\n"
+"\n"
 "void main()\n"
 "{\n"
 "    vec2 p = uQuadPos + fragTexCoord * uQuadSize;\n"
@@ -105,11 +121,20 @@ static const char *UI_GLASS_PANEL_FS =
 "\n"
 "    // Bề rộng khử răng cưa lấy từ đạo hàm màn hình nên mép vẫn sắc\n"
 "    // khi giao diện được phóng to theo kích thước cửa sổ.\n"
+"#ifdef GLASS_HAS_DERIVATIVES\n"
 "    float aa = max(fwidth(d), 0.35);\n"
+"#else\n"
+"    vec2 gp = sdRoundBoxGrad(p - uRectCenter, uRectHalf, uRadius);\n"
+"    float aa = max((abs(gp.x) + abs(gp.y)) / max(uPixelScale, 0.0001), 0.35);\n"   // = fwidth(d): đổi từ đơn vị toạ độ sang pixel màn hình
+"#endif\n"
 "    float shape = 1.0 - smoothstep(-aa, aa, d);\n"
 "    if (shape <= 0.002) discard;\n"
 "\n"
+"#ifdef GLASS_HAS_DERIVATIVES\n"
 "    vec2 grad = vec2(dFdx(d), dFdy(d));\n"
+"#else\n"
+"    vec2 grad = vec2(gp.x, -gp.y);\n"   // dFdy đi theo trục y framebuffer (hướng lên), p.y hướng xuống -> đảo dấu cho khớp
+"#endif\n"
 "    vec2 n = (length(grad) > 0.00001) ? normalize(grad) : vec2(0.0, -1.0);\n"
 "\n"
 "    float depth = -d;\n"                                   // Khoảng cách vào phía trong
@@ -178,6 +203,7 @@ static const char *UI_GLASS_STROKE_FS =
 "uniform vec2  uRectCenter;\n"
 "uniform vec2  uRectHalf;\n"
 "uniform float uRadius;\n"
+"uniform float uPixelScale;\n"   // Pixel màn hình / đơn vị toạ độ (chỉ dùng khi không có dFdx/dFdy)
 "uniform float uThickness;\n"
 "uniform float uSpread;\n"
 "uniform int   uMode;\n"          // 0 = viền, 1 = quầng sáng ngoài, 2 = bóng đổ
@@ -190,11 +216,23 @@ static const char *UI_GLASS_STROKE_FS =
 "    return min(max(q.x, q.y), 0.0) + length(max(q, 0.0)) - r;\n"
 "}\n"
 "\n"
+"vec2 sdRoundBoxGrad(vec2 p, vec2 b, float r)\n"   // Đạo hàm SDF theo 1 pixel canvas, dùng khi không có dFdx/dFdy
+"{\n"
+"    vec2 e = vec2(0.5, 0.0);\n"
+"    return vec2(sdRoundBox(p + e.xy, b, r) - sdRoundBox(p - e.xy, b, r),\n"
+"                sdRoundBox(p + e.yx, b, r) - sdRoundBox(p - e.yx, b, r));\n"
+"}\n"
+"\n"
 "void main()\n"
 "{\n"
 "    vec2 p = uQuadPos + fragTexCoord * uQuadSize;\n"
 "    float d = sdRoundBox(p - uRectCenter, uRectHalf, uRadius);\n"
+"#ifdef GLASS_HAS_DERIVATIVES\n"
 "    float aa = max(fwidth(d), 0.35);\n"
+"#else\n"
+"    vec2 gp = sdRoundBoxGrad(p - uRectCenter, uRectHalf, uRadius);\n"
+"    float aa = max((abs(gp.x) + abs(gp.y)) / max(uPixelScale, 0.0001), 0.35);\n"
+"#endif\n"
 "    float a = 0.0;\n"
 "    if (uMode == 0)\n"
 "    {\n"

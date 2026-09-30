@@ -27,7 +27,10 @@ typedef enum {
     UI_FOCUS_FLAG_NONE  = 0,
     // Widget tự dùng phím Trái/Phải để chỉnh giá trị (thanh trượt, nhóm
     // nút chọn), nên điều hướng ngang sẽ không nhảy sang widget khác.
-    UI_FOCUS_CONSUMES_H = 1 << 0
+    UI_FOCUS_CONSUMES_H = 1 << 0,
+    // Mục đang nằm ngoài khung nhìn (danh sách cuộn): vẫn tới được bằng phím,
+    // nhưng bấm chuột vào vùng đó thì không tính là chọn nó.
+    UI_FOCUS_NO_MOUSE   = 1 << 1
 } UiFocusFlags;
 
 // Ý định điều hướng của khung hình này, do tầng trên nạp vào.

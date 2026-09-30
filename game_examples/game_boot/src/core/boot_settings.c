@@ -1,9 +1,10 @@
 #include "boot_settings.h"
 #include "raylib.h"
+#include "save_data.h"
 #include <stdio.h>
 #include <string.h>
 
-#define SETTINGS_FILE "game_boot_settings.txt"
+#define SETTINGS_FILE SaveDataFilePath("game_boot_settings.txt")
 
 static BootSettings s_settings = {
     .glassBlur = 0.62f,
@@ -14,8 +15,20 @@ static BootSettings s_settings = {
     .wallpaperId = "lake_cabin"
 };
 
+// Bản cũ ghi file ngay tại thư mục đang chạy Hub: chép nguyên nội dung sang
+// thư mục dữ liệu chung (chỉ khi bên đó chưa có file).
+static void ImportLegacySettings(const char *legacyPath)
+{
+    if (FileExists(SETTINGS_FILE)) return;
+    char *text = LoadFileText(legacyPath);
+    if (!text) return;
+    SaveFileText(SETTINGS_FILE, text);
+    UnloadFileText(text);
+}
+
 void BootSettingsLoad(void)
 {
+    SaveDataMigrateLegacy("game_boot_settings.txt", ImportLegacySettings);
     if (!FileExists(SETTINGS_FILE)) return;
 
     FILE *f = fopen(SETTINGS_FILE, "r");

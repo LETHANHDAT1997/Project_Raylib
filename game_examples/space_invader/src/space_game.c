@@ -3,6 +3,7 @@
 #include "space_aliens.h"
 #include "space_bunker.h"
 #include "space_audio.h"
+#include "save_data.h"
 #include <stdio.h>
 #include <math.h>
 
@@ -116,7 +117,7 @@ void StartNextWave(SpaceGame *game)
 void InitSpaceGame(SpaceGame *game)
 {
     game->score = 0;
-    game->highScore = 0;
+    game->highScore = SaveDataGetInt(SPACE_SAVE_ID, "best", 0);
     game->wave = 1;
     game->soundEnabled = true;
     game->state = SPACE_STATE_MENU;
@@ -143,6 +144,8 @@ void UpdateSpaceGame(SpaceGame *game, float dt)
     }
 
     if (game->state == SPACE_STATE_GAME_OVER) {
+        // Idempotent: chỉ ghi đĩa đúng một lần khi điểm vượt kỷ lục đã lưu.
+        SaveDataSubmitBest(SPACE_SAVE_ID, "best", game->score);
         if (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_R) || IsKeyPressed(KEY_SPACE)) {
             ResetSpaceGame(game, true);
         }

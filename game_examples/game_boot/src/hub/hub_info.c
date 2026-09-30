@@ -78,8 +78,20 @@ static void DrawGameInfoCard(HubContext *ctx, Rectangle card)
 
     const GameStats *stats = BootStatsGet(ctx->gameIndex);
 
-    char resolution[32];
-    snprintf(resolution, sizeof(resolution), "%d × %d", game->canvasWidth, game->canvasHeight);
+    // Game có lưu điểm thì hàng thứ ba là kỷ lục (đọc từ file dữ liệu của game),
+    // không thì giữ thông tin độ phân giải.
+    char third[32];
+    const char *thirdLabel = "Độ phân giải";
+    UiIconFn thirdIcon = UiIconDisplay;
+    if (game->recordLabel) {
+        int best = 0;
+        thirdLabel = game->recordLabel;
+        thirdIcon = UiIconSparkle;
+        if (BootStatsGetRecord(ctx->gameIndex, &best)) snprintf(third, sizeof(third), "%d", best);
+        else                                            snprintf(third, sizeof(third), "Chưa có");
+    } else {
+        snprintf(third, sizeof(third), "%d × %d", game->canvasWidth, game->canvasHeight);
+    }
 
     char sessions[32];
     snprintf(sessions, sizeof(sessions), "%d lần", stats->sessions);
@@ -91,7 +103,7 @@ static void DrawGameInfoCard(HubContext *ctx, Rectangle card)
     } rows[4] = {
         {UiIconPerson,   "Nhà phát triển", game->developer},
         {UiIconCalendar, "Phiên bản",      game->releaseDate},
-        {UiIconDisplay,  "Độ phân giải",   resolution},
+        {thirdIcon,      thirdLabel,       third},
         {UiIconCounter,  "Số lần khởi động", sessions}
     };
 
