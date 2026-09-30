@@ -4,6 +4,7 @@
 #include "chess_assets.h"
 #include "save_data.h"
 #include "raymath.h"
+#include "perf_hint.h"
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -432,7 +433,7 @@ void InitChessGame(ChessGame *g)
     g->mode = CHESS_MODE_VS_AI;
     g->difficulty = CHESS_AI_NORMAL;
     g->sideChoice = CHESS_SIDE_WHITE;
-    g->highQuality = true;
+    g->highQuality = !PerfHintLite();   // Máy yếu (Pi 0-3) mở ở chất lượng Thấp
     g->soundEnabled = true;
     g->selected = -1;
     g->hoverSquare = -1;
@@ -834,6 +835,6 @@ void UpdateChessGame(ChessGame *g, float dt)
 
 void DrawChessGame(const ChessGame *g)
 {
-    ChessRenderBlit();
+    ChessRenderBlit(g);
     DrawChessHud(g);
 }

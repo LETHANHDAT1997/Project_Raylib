@@ -19,7 +19,9 @@ bool ChessRenderHasModel(void);     // false nếu thiếu file mô hình (đang
 
 void ChessRenderSetQuality(bool high);
 void ChessRenderScene(const ChessGame *game);     // Gọi NGOÀI BeginTextureMode
-void ChessRenderBlit(void);                       // Dán cảnh đã dựng lên canvas hiện tại
+// Dán cảnh đã dựng lên canvas hiện tại. Chế độ nhẹ (hoặc khi không tạo được
+// render target riêng) thì vẽ thẳng cảnh 3D lên canvas tại đây, không bóng đổ.
+void ChessRenderBlit(const ChessGame *game);
 
 // Hình học
 Vector3 ChessSquareWorld(int sq);

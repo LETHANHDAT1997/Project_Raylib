@@ -1,5 +1,6 @@
 #include "chess_render.h"
 #include "chess_assets.h"
+#include "perf_hint.h"
 #include "raymath.h"
 #include "rlgl.h"
 #include <math.h>
@@ -60,8 +61,10 @@ typedef struct {
     int shadowSize;
     bool shadowReady;
     RenderTexture2D scene;
+    bool sceneOk;               // false: không có render target riêng, vẽ thẳng lên canvas
     float ssaa;
     bool highQuality;
+    bool lite;                  // GPU yếu: shader rút gọn, không bóng đổ, không siêu lấy mẫu
 } RenderState;
 
 static RenderState R = {0};
@@ -280,6 +283,7 @@ static const char *LIT_FS =
 "uniform vec4 highlight;\n"
 "uniform float exposure;\n"
 "const float PI = 3.14159265;\n"
+"#ifndef LITE\n"
 "float ShadowFactor(float ndl) {\n"
 "    if (useShadow < 0.5) return 1.0;\n"
 "    vec3 p = fragLightPos.xyz / fragLightPos.w;\n"
@@ -312,7 +316,28 @@ static const char *LIT_FS =
 "    vec3 kd = (vec3(1.0) - F) * (1.0 - metal);\n"
 "    return kd * albedo / PI + spec;\n"
 "}\n"
+"#endif\n"
 "void main() {\n"
+"#ifdef LITE\n"
+// GPU yếu (VC4 của Pi 0-3): Lambert + Blinn-Phong + ánh sáng nền, không
+// normal map / ARM / bóng đổ, tính thẳng trong không gian gamma.
+"    vec4 tex = texture(texture0, fragTexCoord * uvScale);\n"
+"    vec3 albedo = tex.rgb * colDiffuse.rgb;\n"
+"    vec3 N = normalize(fragNormal);\n"
+"    vec3 V = normalize(viewPos - fragPos);\n"
+"    vec3 L = normalize(-lightDir);\n"
+"    float ndl = max(dot(N, L), 0.0);\n"
+"    float fill = max(dot(N, normalize(-fillDir)), 0.0);\n"
+"    vec3 amb = mix(groundColor, skyColor, N.y * 0.5 + 0.5);\n"
+"    vec3 color = albedo * (amb * 1.5 + lightColor * ndl * 0.22 + fillColor * fill * 0.3);\n"
+"    float spec = pow(max(dot(N, normalize(L + V)), 0.0), 40.0) * ndl;\n"
+"    color += lightColor * spec * 0.07 * envStrength;\n"
+"    float rim = pow(1.0 - max(dot(N, V), 0.0), 2.0);\n"
+"    color += highlight.rgb * highlight.a * (0.25 + 1.4 * rim);\n"
+"    float dist = length(viewPos - fragPos);\n"
+"    float fog = exp(-pow(fogDensity * max(dist - fogStart, 0.0), 2.0));\n"
+"    finalColor = vec4(mix(fogColor, clamp(color, 0.0, 1.0), fog), tex.a * colDiffuse.a);\n"
+"#else\n"
 "    vec2 uv = fragTexCoord * uvScale;\n"
 "    vec4 tex = texture(texture0, uv);\n"
 "    vec3 albedo = pow(tex.rgb * colDiffuse.rgb, vec3(2.2));\n"
@@ -357,6 +382,7 @@ static const char *LIT_FS =
 "    float fog = exp(-pow(fogDensity * max(dist - fogStart, 0.0), 2.0));\n"
 "    color = mix(fogColor, color, fog);\n"
 "    finalColor = vec4(color, tex.a * colDiffuse.a);\n"
+"#endif\n"
 "}\n";
 
 static char *Concat(const char *a, const char *b)
@@ -378,7 +404,9 @@ static void LoadLitShader(void)
         default: break;
     }
     char *vs = Concat(vh, LIT_VS);
-    char *fs = Concat(fh, LIT_FS);
+    char *fsHead = Concat(fh, R.lite ? "#define LITE\n" : "");
+    char *fs = Concat(fsHead, LIT_FS);
+    MemFree(fsHead);
     R.lit = LoadShaderFromMemory(vs, fs);
     MemFree(vs);
     MemFree(fs);
@@ -419,11 +447,21 @@ static void SetV4(int loc, Vector4 v) { if (R.litReady) SetShaderValue(R.lit, lo
 
 // ------------------------------------------------------------------ texture
 
-static Texture2D LoadTex(const char *relative, bool repeat)
+// maxSize > 0: thu nhỏ ảnh trước khi đưa lên GPU (tiết kiệm bộ nhớ trên Pi).
+static Texture2D LoadTex(const char *relative, bool repeat, int maxSize)
 {
     const char *path = ChessAssetPath(relative);
     Texture2D t = {0};
-    if (FileExists(path)) t = LoadTexture(path);
+    if (FileExists(path)) {
+        Image img = LoadImage(path);
+        if (IsImageValid(img)) {
+            if (maxSize > 0 && img.width > maxSize) {
+                ImageResize(&img, maxSize, img.height * maxSize / img.width);
+            }
+            t = LoadTextureFromImage(img);
+            UnloadImage(img);
+        }
+    }
     if (t.id == 0) {
         TraceLog(LOG_WARNING, "CHESS: thiếu texture '%s'", path);
         Image img = GenImageColor(4, 4, (Color){128, 128, 255, 255});
@@ -610,12 +648,34 @@ static void LoadShadowTarget(int size)
 static void LoadSceneTarget(float ssaa)
 {
     if (R.scene.id > 0) UnloadRenderTexture(R.scene);
+    R.scene = (RenderTexture2D){0};
+    R.sceneOk = false;
+    R.ssaa = 1.0f;
+    // Không bóng đổ thì chẳng cần đổi framebuffer giữa chừng: vẽ thẳng lên
+    // canvas của game, bỏ được ~12 MB bộ nhớ GPU và một lần chép toàn màn hình.
+    if (R.lite) return;
+
     R.ssaa = ssaa;
     R.scene = LoadRenderTexture((int)(CHESS_CANVAS_W * ssaa), (int)(CHESS_CANVAS_H * ssaa));
-    if (R.scene.id == 0 && ssaa > 1.0f) {          // GPU không đủ bộ nhớ: lùi về 1x
+    // raylib vẫn trả id > 0 khi framebuffer hỏng, nên phải hỏi thẳng GPU. Hay
+    // gặp nhất: 3200x1800 vượt giới hạn texture 2048 của VC4 (Pi 0-3) - vẽ vào
+    // đó không ra gì, bàn cờ đen thui. Hoặc hết bộ nhớ GPU. Lùi về 1x.
+    bool ok = R.scene.id > 0 && rlFramebufferComplete(R.scene.id);
+    if (!ok && ssaa > 1.0f) {
+        TraceLog(LOG_WARNING, "CHESS: không tạo được cảnh %dx%d, lùi về 1x",
+                 (int)(CHESS_CANVAS_W * ssaa), (int)(CHESS_CANVAS_H * ssaa));
+        if (R.scene.id > 0) UnloadRenderTexture(R.scene);
         R.ssaa = 1.0f;
         R.scene = LoadRenderTexture(CHESS_CANVAS_W, CHESS_CANVAS_H);
+        ok = R.scene.id > 0 && rlFramebufferComplete(R.scene.id);
     }
+    if (!ok) {
+        TraceLog(LOG_WARNING, "CHESS: render target của cảnh không hợp lệ, vẽ thẳng lên canvas (không bóng đổ)");
+        if (R.scene.id > 0) UnloadRenderTexture(R.scene);
+        R.scene = (RenderTexture2D){0};
+        R.ssaa = 1.0f;
+    }
+    R.sceneOk = ok;
     SetTextureFilter(R.scene.texture, TEXTURE_FILTER_BILINEAR);
 }
 
@@ -624,16 +684,21 @@ void ChessRenderSetQuality(bool high)
     if (R.refCount <= 0) return;
     if (R.scene.id > 0 && R.highQuality == high) return;
     R.highQuality = high;
-    LoadSceneTarget(high ? SSAA_HIGH : SSAA_LOW);
-    LoadShadowTarget(high ? SHADOW_SIZE_HIGH : SHADOW_SIZE_LOW);
+    // Máy yếu: bộ lọc bóng 25 mẫu và siêu lấy mẫu 2x là quá sức, bỏ hẳn.
+    LoadSceneTarget((high && !R.lite) ? SSAA_HIGH : SSAA_LOW);
+    if (R.lite) UnloadShadowTarget();
+    else LoadShadowTarget(high ? SHADOW_SIZE_HIGH : SHADOW_SIZE_LOW);
 }
 
 // ------------------------------------------------------------------ nạp / giải phóng
+
+static void ProbeAndFallback(void);
 
 void ChessRenderInit(void)
 {
     if (R.refCount++ > 0) return;
 
+    R.lite = PerfHintLite();
     LoadLitShader();
 
     const char *modelPath = ChessAssetPath("model/chess_set.gltf");
@@ -650,16 +715,24 @@ void ChessRenderInit(void)
         }
     }
 
-    R.boardDiff    = LoadTex("model/textures/chess_set_board_diff_2k.jpg", false);
-    R.boardNor     = LoadTex("model/textures/chess_set_board_nor_gl_1k.jpg", false);
-    R.boardArm     = LoadTex("model/textures/chess_set_board_arm_1k.jpg", false);
-    R.pieceDiff[0] = LoadTex("model/textures/chess_set_pieces_white_diff_1k.jpg", false);
-    R.pieceNor[0]  = LoadTex("model/textures/chess_set_pieces_white_nor_gl_1k.jpg", false);
-    R.pieceArm[0]  = LoadTex("model/textures/chess_set_pieces_white_arm_1k.jpg", false);
-    R.pieceDiff[1] = LoadTex("model/textures/chess_set_pieces_black_diff_1k.jpg", false);
-    R.pieceNor[1]  = LoadTex("model/textures/chess_set_pieces_black_nor_gl_1k.jpg", false);
-    R.pieceArm[1]  = LoadTex("model/textures/chess_set_pieces_black_arm_1k.jpg", false);
-    R.tableDiff    = LoadTex("textures/wood_table.jpg", true);
+    // Shader rút gọn chỉ dùng ảnh màu: bỏ normal/ARM và dùng bản 1K cho bàn
+    // cờ, đỡ ~40 MB bộ nhớ GPU vốn rất hạn chế trên Pi.
+    // Quân cờ và mặt bàn gỗ chiếm ít pixel trên màn hình: bản 512 px là đủ,
+    // mỗi ảnh đỡ ~4 MB bộ nhớ GPU.
+    int small = R.lite ? 512 : 0;
+    R.boardDiff = LoadTex(R.lite ? "model/textures/chess_set_board_diff_1k.jpg"
+                                 : "model/textures/chess_set_board_diff_2k.jpg", false, 0);
+    R.pieceDiff[0] = LoadTex("model/textures/chess_set_pieces_white_diff_1k.jpg", false, small);
+    R.pieceDiff[1] = LoadTex("model/textures/chess_set_pieces_black_diff_1k.jpg", false, small);
+    if (!R.lite) {
+        R.boardNor    = LoadTex("model/textures/chess_set_board_nor_gl_1k.jpg", false, 0);
+        R.boardArm    = LoadTex("model/textures/chess_set_board_arm_1k.jpg", false, 0);
+        R.pieceNor[0] = LoadTex("model/textures/chess_set_pieces_white_nor_gl_1k.jpg", false, 0);
+        R.pieceArm[0] = LoadTex("model/textures/chess_set_pieces_white_arm_1k.jpg", false, 0);
+        R.pieceNor[1] = LoadTex("model/textures/chess_set_pieces_black_nor_gl_1k.jpg", false, 0);
+        R.pieceArm[1] = LoadTex("model/textures/chess_set_pieces_black_arm_1k.jpg", false, 0);
+    }
+    R.tableDiff    = LoadTex("textures/wood_table.jpg", true, small);
 
     R.softSquare = MakeOverlay(OVL_SOFT_SQUARE);
     R.disc = MakeOverlay(OVL_DISC);
@@ -676,9 +749,11 @@ void ChessRenderInit(void)
     R.tableMesh = GenMeshPlane(70.0f, 70.0f, 1, 1);
     GenMeshTangents(&R.tableMesh);
 
-    R.highQuality = true;
-    LoadSceneTarget(SSAA_HIGH);
-    LoadShadowTarget(SHADOW_SIZE_HIGH);
+    ProbeAndFallback();
+
+    R.highQuality = !R.lite;
+    LoadSceneTarget(R.lite ? SSAA_LOW : SSAA_HIGH);
+    if (!R.lite) LoadShadowTarget(SHADOW_SIZE_HIGH);
 }
 
 void ChessRenderClose(void)
@@ -856,7 +931,7 @@ static Vector4 VisualHighlight(const ChessGame *g, const ChessVisual *v)
     return (Vector4){0, 0, 0, 0};
 }
 
-static void SetSceneUniforms(Vector3 viewPos, float camDistance, Matrix lightVP)
+static void SetSceneUniforms(Vector3 viewPos, float camDistance, Matrix lightVP, bool shadow)
 {
     if (!R.litReady) return;
     Vector3 ld = Vector3Normalize(LIGHT_DIR);
@@ -870,7 +945,7 @@ static void SetSceneUniforms(Vector3 viewPos, float camDistance, Matrix lightVP)
     SetV3(R.locFogColor, (Vector3){BG_BOTTOM.r / 255.0f * 1.3f, BG_BOTTOM.g / 255.0f * 1.3f, BG_BOTTOM.b / 255.0f * 1.3f});
     SetF(R.locFogDensity, 0.065f);
     SetF(R.locFogStart, camDistance + 2.0f);
-    SetF(R.locUseShadow, R.shadowReady ? 1.0f : 0.0f);
+    SetF(R.locUseShadow, shadow ? 1.0f : 0.0f);
     SetF(R.locShadowTexel, 1.0f / (float)(R.shadowSize > 0 ? R.shadowSize : 1024));
     SetF(R.locExposure, 1.0f);
     SetShaderValueMatrix(R.lit, R.locLightVP, lightVP);
@@ -922,11 +997,131 @@ static void DrawAllPieces(const ChessGame *g, bool depthOnly)
     }
 }
 
+// ------------------------------------------------------------------ tự kiểm tra
+//
+// Driver có thể "nuốt" lệnh vẽ mà không báo lỗi gì: Mesa vc4 (Pi 0-3) chỉ
+// biên dịch shader thật sự lúc vẽ, shader vượt số thanh ghi của GPU thì draw
+// call bị bỏ qua - cảnh chỉ còn nền tối. Texture không cấp được bộ nhớ GPU thì
+// lấy mẫu ra màu đen. Nên dựng thử một góc bàn cờ vào texture nhỏ, đọc pixel
+// về xem có ra hình thật không, rồi lùi dần sang cách vẽ đơn giản hơn.
+
+typedef enum { PROBE_OK = 0, PROBE_NOTHING, PROBE_DARK, PROBE_UNKNOWN } ProbeResult;
+
+static const char *ProbeName(ProbeResult r)
+{
+    switch (r) {
+        case PROBE_OK:      return "ra hình";
+        case PROBE_NOTHING: return "không vẽ được gì";
+        case PROBE_DARK:    return "vẽ ra toàn màu tối";
+        default:            return "không kiểm tra được";
+    }
+}
+
+static ProbeResult ProbeBoard(void)
+{
+    RenderTexture2D rt = LoadRenderTexture(64, 64);
+    if (rt.id == 0 || !rlFramebufferComplete(rt.id)) {
+        if (rt.id > 0) UnloadRenderTexture(rt);
+        return PROBE_UNKNOWN;
+    }
+
+    // Nhìn thẳng xuống 4x4 ô giữa bàn: một nửa là ô trắng, phải ra điểm sáng.
+    Camera3D cam = {0};
+    cam.position = (Vector3){0.0f, 20.0f, 0.0f};
+    cam.target = (Vector3){0.0f, 0.0f, 0.0f};
+    cam.up = (Vector3){0.0f, 0.0f, 1.0f};
+    cam.fovy = 4.0f;
+    cam.projection = CAMERA_ORTHOGRAPHIC;
+
+    BeginTextureMode(rt);
+        ClearBackground(MAGENTA);
+        BeginMode3D(cam);
+            SetSceneUniforms(cam.position, 20.0f, MatrixIdentity(), false);
+            SetSurface(1.0f, 1.0f, 1.0f, 1.0f, 1.0f);
+            DrawMesh(R.model.meshes[R.boardMesh], R.boardMat, MatrixScale(WORLD_SCALE, WORLD_SCALE, WORLD_SCALE));
+        EndMode3D();
+    EndTextureMode();
+
+    Image img = LoadImageFromTexture(rt.texture);
+    UnloadRenderTexture(rt);
+    if (img.data == NULL) return PROBE_UNKNOWN;
+
+    Color *px = LoadImageColors(img);
+    int total = img.width * img.height, untouched = 0, bright = 0;
+    for (int i = 0; i < total; i++) {
+        if (px[i].r > 240 && px[i].g < 16 && px[i].b > 240) untouched++;
+        else if (px[i].r + px[i].g + px[i].b > 3 * 70) bright++;
+    }
+    UnloadImageColors(px);
+    UnloadImage(img);
+
+    if (untouched > total * 9 / 10) return PROBE_NOTHING;
+    if (bright < total / 10) return PROBE_DARK;
+    return PROBE_OK;
+}
+
+static void UseDefaultShader(void)
+{
+    if (R.litReady) UnloadShader(R.lit);
+    R.litReady = false;
+    R.lit = (Shader){rlGetShaderIdDefault(), rlGetShaderLocsDefault()};
+    R.boardMat.shader = R.lit;
+    R.pieceMat[0].shader = R.lit;
+    R.pieceMat[1].shader = R.lit;
+    R.tableMat.shader = R.lit;
+}
+
+static void ProbeAndFallback(void)
+{
+    if (R.hasModel) {
+        ProbeResult r = ProbeBoard();
+        TraceLog(LOG_INFO, "CHESS: tự kiểm tra với shader %s: %s",
+                 R.litReady ? "ánh sáng" : "mặc định", ProbeName(r));
+
+        if ((r == PROBE_NOTHING || r == PROBE_DARK) && R.litReady) {
+            TraceLog(LOG_WARNING, "CHESS: GPU không chạy được shader ánh sáng, dùng shader mặc định (không đổ sáng)");
+            UseDefaultShader();
+            r = ProbeBoard();
+            TraceLog(LOG_INFO, "CHESS: tự kiểm tra với shader mặc định: %s", ProbeName(r));
+        }
+        if (r == PROBE_NOTHING || r == PROBE_DARK) {
+            TraceLog(LOG_WARNING, "CHESS: mô hình 3D không hiện được, dùng quân cờ dựng bằng khối cơ bản");
+            R.hasModel = false;
+        }
+    }
+    TraceLog(LOG_INFO, "CHESS: đồ hoạ %s, shader %s, quân cờ %s", R.lite ? "nhẹ" : "đầy đủ",
+             R.litReady ? "ánh sáng" : "mặc định", R.hasModel ? "mô hình 3D" : "khối dự phòng");
+}
+
+// Nền + cảnh 3D, vẽ vào render target đang mở (của cảnh hoặc canvas game).
+static void DrawSceneContents(const ChessGame *g, int width, int height, Matrix lightVP, bool shadow)
+{
+    Camera3D cam = ChessCameraFromRig(&g->cam);
+
+    ClearBackground(BG_BOTTOM);
+    DrawRectangleGradientV(0, 0, width, height, BG_TOP, BG_BOTTOM);
+
+    BeginMode3D(cam);
+        rlMatrixMode(RL_PROJECTION);
+        rlLoadIdentity();
+        {
+            Matrix p = SceneProjection();
+            rlMultMatrixf(MatrixToFloatV(p).v);
+        }
+        rlMatrixMode(RL_MODELVIEW);
+
+        SetSceneUniforms(cam.position, g->cam.distance, lightVP, shadow);
+        DrawBoardAndTable(false);
+        DrawOverlays(g);
+        DrawAllPieces(g, false);
+    EndMode3D();
+}
+
 void ChessRenderScene(const ChessGame *g)
 {
-    if (R.refCount <= 0 || R.scene.id == 0) return;
+    // Không có render target riêng: cảnh được vẽ ở ChessRenderBlit.
+    if (R.refCount <= 0 || !R.sceneOk) return;
 
-    Camera3D cam = ChessCameraFromRig(&g->cam);
     Matrix lightVP = MatrixIdentity();
 
     // Lượt 1: độ sâu nhìn từ nguồn sáng (chiếu trực giao ôm trọn bàn và quân bị bắt)
@@ -962,33 +1157,22 @@ void ChessRenderScene(const ChessGame *g)
 
     // Lượt 2: cảnh chính vào render texture siêu lấy mẫu
     BeginTextureMode(R.scene);
-        ClearBackground(BG_BOTTOM);
-        DrawRectangleGradientV(0, 0, R.scene.texture.width, R.scene.texture.height, BG_TOP, BG_BOTTOM);
-
-        BeginMode3D(cam);
-            rlMatrixMode(RL_PROJECTION);
-            rlLoadIdentity();
-            {
-                Matrix p = SceneProjection();
-                rlMultMatrixf(MatrixToFloatV(p).v);
-            }
-            rlMatrixMode(RL_MODELVIEW);
-
-            SetSceneUniforms(cam.position, g->cam.distance, lightVP);
-            DrawBoardAndTable(false);
-            DrawOverlays(g);
-            DrawAllPieces(g, false);
-        EndMode3D();
+        DrawSceneContents(g, R.scene.texture.width, R.scene.texture.height, lightVP, R.shadowReady);
     EndTextureMode();
 }
 
-void ChessRenderBlit(void)
+void ChessRenderBlit(const ChessGame *g)
 {
-    if (R.scene.id == 0) {
+    if (R.refCount <= 0) {
         ClearBackground(BG_BOTTOM);
+        return;
+    }
+    if (!R.sceneOk) {
+        DrawSceneContents(g, CHESS_CANVAS_W, CHESS_CANVAS_H, MatrixIdentity(), false);
         return;
     }
     Rectangle src = {0.0f, 0.0f, (float)R.scene.texture.width, -(float)R.scene.texture.height};
     Rectangle dst = {0.0f, 0.0f, (float)CHESS_CANVAS_W, (float)CHESS_CANVAS_H};
+    ClearBackground(BG_BOTTOM);
     DrawTexturePro(R.scene.texture, src, dst, (Vector2){0.0f, 0.0f}, 0.0f, WHITE);
 }

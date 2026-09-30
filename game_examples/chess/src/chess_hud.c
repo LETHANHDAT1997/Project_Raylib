@@ -1,6 +1,7 @@
 #include "chess_hud.h"
 #include "chess_render.h"
 #include "font_vn.h"
+#include "perf_hint.h"
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
@@ -137,6 +138,12 @@ static bool Hovered(Rectangle r)
 
 static void SoftShadow(Rectangle r, float roundness, float spread, float alpha)
 {
+    if (PerfHintLite()) {
+        // Máy yếu: một tầng thay cho sáu (mỗi tầng là một lớp phủ bán trong suốt).
+        Rectangle s = {r.x - spread * 0.3f, r.y + spread * 0.2f, r.width + spread * 0.6f, r.height + spread * 0.5f};
+        DrawRectangleRounded(s, roundness, 12, WithAlpha(BLACK, alpha * 0.5f));
+        return;
+    }
     for (int i = 6; i >= 1; i--) {
         float g = spread * (float)i / 6.0f;
         Rectangle s = {r.x - g, r.y - g + spread * 0.5f, r.width + g * 2.0f, r.height + g * 2.0f};
