@@ -19,7 +19,9 @@ static const char *VIETNAMESE_UNICODE_CHARS =
     "ỌọỎỏỐốỒồỔổỖỗỘộỚớỜờỞởỠỡỢợỤụỦủỨứỪừỬửỮữỰựỲỳỴỵỶỷỸỹ"
     "•★▶◀▲▼←→↑↓↖↗↘↙‹›∞⌂🔄💡🔊🔇"
     // Ký tự dấu câu và biểu tượng mà giao diện Liquid Glass sử dụng
-    "·–—…×✓°«»";
+    "·–—…×✓°«»"
+    // Quân cờ vua (Cờ Vua 3D dùng cho biên bản, quân bị bắt, hộp phong cấp)
+    "♔♕♖♗♘♙♚♛♜♝♞♟";
 
 static const char *FindFontPath(const char *fontName)
 {

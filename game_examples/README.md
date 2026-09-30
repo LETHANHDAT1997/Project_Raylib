@@ -1,6 +1,6 @@
 # 🎮 Raylib Game Examples & Arcade Master Hub
 
-Tuyển tập 5 trò chơi cổ điển được xây dựng bằng **C** và thư viện đồ họa **Raylib**, tích hợp kiến trúc **Virtual Canvas tự động thích ứng với mọi độ phân giải màn hình (HD, Full HD, 2K, 4K, Fullscreen)** và trình khởi động trung tâm **`game_boot` (Arcade Hub)** với giao diện **Liquid Glass**.
+Tuyển tập 7 trò chơi (arcade, đối kháng, cờ caro 2D và cờ vua 3D) được xây dựng bằng **C** và thư viện đồ họa **Raylib**, tích hợp kiến trúc **Virtual Canvas tự động thích ứng với mọi độ phân giải màn hình (HD, Full HD, 2K, 4K, Fullscreen)** và trình khởi động trung tâm **`game_boot` (Arcade Hub)** với giao diện **Liquid Glass**.
 
 ---
 
@@ -83,6 +83,20 @@ game_examples/
 │   │   └── fighter_runner.h    # API kiểu C để Arcade Hub gọi sang C++
 │   └── src/                    # Cùng cấu trúc thư mục với inc/
 │
+├── caro/                       # Game 6: Cờ Caro 2D - đấu máy 3 mức / 2 người (1280x720)
+│   ├── CMakeLists.txt          # CMake độc lập cho Caro
+│   ├── build_and_run.sh        # Script build và chạy Caro độc lập
+│   ├── README.md               # Luật, tuỳ chọn và cách AI chơi
+│   ├── inc/                    # caro_types.h, caro_rules.h, caro_ai.h, caro_draw.h, ...
+│   └── src/                    # main.c, caro_rules.c, caro_ai.c, caro_draw.c, ...
+│
+├── chess/                      # Game 7: Cờ Vua 3D - PBR + bóng đổ, đấu máy 3 mức (1600x900)
+│   ├── CMakeLists.txt          # CMake độc lập cho Cờ Vua
+│   ├── build_and_run.sh        # Script build và chạy Cờ Vua độc lập
+│   ├── README.md               # Luật, AI, kiến trúc dựng cảnh 3D
+│   ├── inc/                    # chess_board.h, chess_ai.h, chess_render.h, chess_hud.h, ...
+│   └── src/                    # main.c, chess_board.c, chess_ai.c, chess_render.c, ...
+│
 ├── common/                     # Mã dùng chung cho mọi game
 │   ├── font_vn.h               # API vẽ chữ Unicode tiếng Việt
 │   └── font_vn.c
@@ -91,6 +105,8 @@ game_examples/
     ├── fonts/                  # dejavu.ttf, dejavu_bold.ttf
     ├── wallpapers/             # Ảnh nền của Hub - thả thêm file vào đây là xong
     ├── flappy/                 # Sprite + âm thanh Kenney của Flappy Plane (CC0, xem LICENSES.md)
+    ├── caro/                   # Vân gỗ Poly Haven + âm thanh Kenney của Cờ Caro (CC0)
+    ├── chess/                  # Mô hình 3D "Chess Set" Poly Haven + âm thanh Kenney (CC0)
     └── fighter/                # Sprite của game Đấu Sĩ (giấy phép CC0, xem LICENSES.md)
         ├── characters/<id>/    # 8 file: idle, run, jump, fall, attack1, attack2, takehit, death
         └── backgrounds/        # Các lớp ảnh parallax của sân đấu
@@ -272,7 +288,9 @@ Quy ước: khoá `best` là kỷ lục tổng của game - Hub đọc khoá nà
 "Thông tin game". Game có thể lưu thêm khoá khác (Flappy lưu `best.easy`, `best.normal`, `best.hard`).
 Tên file trùng với `id` của game trong `game_registry.c`, nên khi bấm **Xoá thống kê & kỷ lục game này**
 (menu `···` cạnh nút Chơi) hoặc **Xoá toàn bộ thống kê & kỷ lục** (trang Cài đặt), Hub biết chính xác
-file nào cần xoá. Đấu Sĩ hiện chưa lưu điểm nên chỉ có thống kê thời gian chơi.
+file nào cần xoá. Đấu Sĩ hiện chưa lưu điểm nên chỉ có thống kê thời gian chơi. Cờ Caro và Cờ Vua
+lưu số ván thắng / thua / hoà với máy theo từng độ khó (`win.easy`, `loss.hard`, …) và dùng `best`
+cho tổng số ván thắng máy - Hub hiển thị ở dòng **Thắng máy**.
 
 Bản cũ ghi các file `game_boot_*.txt`, `snake_highscore.dat`, `flappy_highscore.dat` ngay tại thư mục
 đang chạy. Lần khởi động đầu tiên, Hub tự chuyển chúng sang thư mục mới rồi đổi tên file cũ thành
@@ -316,6 +334,18 @@ cd game_examples/fighter
 ./build_and_run.sh
 ```
 
+### 6. Game Cờ Caro
+```bash
+cd game_examples/caro
+./build_and_run.sh
+```
+
+### 7. Game Cờ Vua 3D
+```bash
+cd game_examples/chess
+./build_and_run.sh
+```
+
 ---
 
 ## ⚡ Build Toàn Bộ Dự Án Bằng Script Tổng
@@ -334,3 +364,5 @@ Tất cả các file thực thi sẽ được tạo sẵn trong thư mục `buil
 * `./build/snake/snake`
 * `./build/flappy/flappy`
 * `./build/fighter/fighter`
+* `./build/caro/caro`
+* `./build/chess/chess`

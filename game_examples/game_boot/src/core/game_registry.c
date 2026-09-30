@@ -6,6 +6,8 @@
 #include "snake_runner.h"
 #include "flappy_runner.h"
 #include "fighter_runner.h"
+#include "caro_runner.h"
+#include "chess_runner.h"
 
 #include <string.h>
 
@@ -155,6 +157,66 @@ static const GameEntry s_games[] = {
         .drawHeroArt = HubArtFighterHero,
         .init = InitFighterApp, .update = UpdateFighterApp,
         .draw = DrawFighterApp, .close = CloseFighterApp
+    },
+    {
+        .id = "caro",
+        .title = "Cờ Caro",
+        .platform = "PC · Raylib",
+        .tagline = "Năm quân liền hàng là thắng. Đấu máy ba mức Dễ - Thường - Khó, "
+                   "hoặc hai người chung một máy, có luật chặn hai đầu kiểu Việt Nam.",
+        .developer = "Raylib Arcade",
+        .releaseDate = "Bản dựng 2026",
+        .engine = "Raylib 6.x",
+        .tags = {"Cờ bàn", "Chiến thuật", "Đấu máy", "2 người"},
+        .tagCount = 4,
+        .controls = {
+            "Chuột / mũi tên + Enter  Đặt quân",
+            "U  Hoàn tác · H  Gợi ý",
+            "N  Ván mới",
+            "↑ ↓ ← →  Chọn tuỳ chọn (menu)",
+            "Esc  Tạm dừng",
+            "M  Bật / tắt âm thanh"
+        },
+        .controlCount = 6,
+        .recordLabel = "Thắng máy",
+        .canvasWidth = 1280,
+        .canvasHeight = 720,
+        .accent     = (Color){255, 198, 92, 255},
+        .accentDeep = (Color){176, 104, 40, 255},
+        .drawIcon = HubArtCaroIcon,
+        .drawHeroArt = HubArtCaroHero,
+        .init = InitCaroApp, .update = UpdateCaroApp,
+        .draw = DrawCaroApp, .close = CloseCaroApp
+    },
+    {
+        .id = "chess",
+        .title = "Cờ Vua 3D",
+        .platform = "PC · Raylib 3D",
+        .tagline = "Bộ cờ đá cẩm thạch 3D với ánh sáng PBR và bóng đổ. Luật quốc tế "
+                   "đầy đủ, máy ba mức Dễ - Thường - Khó, gợi ý nước và hoàn tác.",
+        .developer = "Raylib Arcade",
+        .releaseDate = "Bản dựng 2026",
+        .engine = "Raylib 6.x · OpenGL 3D",
+        .tags = {"Cờ bàn", "3D", "Chiến thuật", "Đấu máy"},
+        .tagCount = 4,
+        .controls = {
+            "Chuột trái  Chọn & đi quân",
+            "Chuột phải kéo · lăn  Xoay · phóng to",
+            "Mũi tên + Enter  Đi quân bằng phím",
+            "U  Hoàn tác · H  Gợi ý",
+            "F  Xoay bàn · V  Nhìn từ trên",
+            "N  Ván mới · Esc  Tạm dừng"
+        },
+        .controlCount = 6,
+        .recordLabel = "Thắng máy",
+        .canvasWidth = 1600,
+        .canvasHeight = 900,
+        .accent     = (Color){236, 206, 150, 255},
+        .accentDeep = (Color){120, 96, 70, 255},
+        .drawIcon = HubArtChessIcon,
+        .drawHeroArt = HubArtChessHero,
+        .init = InitChessApp, .update = UpdateChessApp,
+        .draw = DrawChessApp, .close = CloseChessApp
     }
 };
 

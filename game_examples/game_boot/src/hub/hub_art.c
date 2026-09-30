@@ -1,10 +1,13 @@
 #include "hub_art.h"
 #include "ui_theme.h"
 #include "flappy_assets.h"
+#include "caro_assets.h"
+#include "chess_assets.h"
 #include <math.h>
 
 // Artwork vẽ bằng primitive nên không cần file ảnh và luôn sắc nét ở mọi độ
-// phân giải (riêng Flappy Plane dùng thẳng sprite của game, xem cuối file).
+// phân giải (riêng Flappy Plane, Cờ Caro và Cờ Vua dùng thẳng tài nguyên của
+// game, xem cuối file).
 // Mỗi game có hai biến thể: icon vuông nhỏ và tranh hero.
 
 // Toạ độ tương đối 0..1 trong khung art, giúp cùng một hình dùng lại được
@@ -382,12 +385,26 @@ static const FlappyAssets *FlappyArt(void)
     return FlappyAssetsGet();
 }
 
+static bool s_caroArtLoaded = false;
+static Texture2D s_chessHero = {0};
+static Texture2D s_chessIcon = {0};
+static bool s_chessArtTried = false;
+
 void HubArtRelease(void)
 {
     if (s_flappyArtLoaded) {
         UnloadFlappyAssets();
         s_flappyArtLoaded = false;
     }
+    if (s_caroArtLoaded) {
+        UnloadCaroAssets();
+        s_caroArtLoaded = false;
+    }
+    if (s_chessHero.id > 0) UnloadTexture(s_chessHero);
+    if (s_chessIcon.id > 0) UnloadTexture(s_chessIcon);
+    s_chessHero = (Texture2D){0};
+    s_chessIcon = (Texture2D){0};
+    s_chessArtTried = false;
 }
 
 static void DrawTexCentered(Texture2D tex, Vector2 c, float scale, float rot)
@@ -461,4 +478,162 @@ void HubArtFlappyHero(Rectangle area, float time)
     DrawTexCentered(a->puffSmall, (Vector2){plane.x - 44.0f * s, plane.y + 4.0f * s}, s * 0.7f, time * 40.0f);
     DrawTexCentered(a->puffLarge, (Vector2){plane.x - 70.0f * s, plane.y + 8.0f * s}, s * 0.55f, -time * 30.0f);
     DrawTexCentered(a->plane[1][frame], plane, s * 0.85f, -wave * 12.0f);
+}
+
+// --------------------------------------------------------------- CỜ CARO
+
+// Dùng chính vân gỗ và shader vẽ quân X/O của game, nên tranh trong Hub
+// giống hệt bàn cờ khi vào chơi.
+static void CaroArt(void)
+{
+    if (!s_caroArtLoaded) {
+        LoadCaroAssets();
+        s_caroArtLoaded = true;
+    }
+}
+
+static const Color CARO_X_COL  = {236, 84, 84, 255};
+static const Color CARO_X_EDGE = {150, 28, 40, 255};
+static const Color CARO_O_COL  = {64, 142, 236, 255};
+static const Color CARO_O_EDGE = {22, 64, 150, 255};
+
+static void CaroWood(Rectangle dst, float texScale, Color tint)
+{
+    const CaroAssets *a = CaroAssetsGet();
+    Rectangle src = {0.0f, 0.0f, dst.width * texScale, dst.height * texScale};
+    DrawTexturePro(a->wood, src, dst, (Vector2){0.0f, 0.0f}, 0.0f, tint);
+}
+
+void HubArtCaroIcon(Rectangle area, float time)
+{
+    CaroArt();
+    float u = Unit(area);
+    Rectangle board = {area.x + area.width * 0.5f - u * 0.46f, area.y + area.height * 0.5f - u * 0.46f, u * 0.92f, u * 0.92f};
+    CaroWood(board, 2.0f, WHITE);
+    DrawRectangleRec(board, (Color){255, 234, 196, 70});
+    for (int i = 1; i < 3; i++) {
+        float t = board.width * (float)i / 3.0f;
+        DrawLineEx((Vector2){board.x + t, board.y}, (Vector2){board.x + t, board.y + board.height}, fmaxf(1.0f, u * 0.012f), (Color){92, 58, 30, 150});
+        DrawLineEx((Vector2){board.x, board.y + t}, (Vector2){board.x + board.width, board.y + t}, fmaxf(1.0f, u * 0.012f), (Color){92, 58, 30, 150});
+    }
+    float c = board.width / 3.0f;
+    float pulse = 0.25f + 0.2f * sinf(time * 2.5f);
+    CaroDrawShape(CARO_SHAPE_X, (Rectangle){board.x + c * 0.08f, board.y + c * 0.08f, c * 0.84f, c * 0.84f}, 0.0f, CARO_X_COL, CARO_X_EDGE, 1.0f, 0.0f, 1.0f);
+    CaroDrawShape(CARO_SHAPE_O, (Rectangle){board.x + c * 1.08f, board.y + c * 1.08f, c * 0.84f, c * 0.84f}, 0.0f, CARO_O_COL, CARO_O_EDGE, 1.0f, pulse, 1.0f);
+    CaroDrawShape(CARO_SHAPE_X, (Rectangle){board.x + c * 2.08f, board.y + c * 2.08f, c * 0.84f, c * 0.84f}, 0.0f, CARO_X_COL, CARO_X_EDGE, 1.0f, 0.0f, 1.0f);
+}
+
+void HubArtCaroHero(Rectangle area, float time)
+{
+    CaroArt();
+    FillBackdrop(area, (Color){46, 30, 22, 255}, (Color){14, 10, 10, 255});
+    Bloom(At(area, 0.78f, 0.35f), area.height * 0.9f, (Color){255, 180, 110, 255});
+
+    // Bàn gỗ lớn tràn mép phải, nghiêng góc nhẹ cho có chiều sâu
+    float cell = area.height / 9.0f;
+    int cols = 10, rows = 11;
+    Rectangle board = {area.x + area.width * 0.48f, area.y - cell * 0.6f, cell * cols, cell * rows};
+    for (int i = 6; i >= 1; i--) {
+        float g = cell * 0.12f * (float)i;
+        DrawRectangleRec((Rectangle){board.x - g, board.y - g + cell * 0.2f, board.width + g * 2, board.height + g * 2},
+                         UiAlpha(BLACK, 0.08f));
+    }
+    CaroWood(board, 1.0f, WHITE);
+    DrawRectangleRec(board, (Color){255, 234, 196, 80});
+    for (int i = 0; i <= cols; i++) {
+        DrawLineEx((Vector2){board.x + i * cell, board.y}, (Vector2){board.x + i * cell, board.y + board.height}, 1.5f, (Color){92, 58, 30, 150});
+    }
+    for (int i = 0; i <= rows; i++) {
+        DrawLineEx((Vector2){board.x, board.y + i * cell}, (Vector2){board.x + board.width, board.y + i * cell}, 1.5f, (Color){92, 58, 30, 150});
+    }
+
+    // Ván mẫu: quân lần lượt được vẽ nét, cuối cùng X thắng đường chéo
+    static const int MOVES[][2] = {{3, 5}, {4, 5}, {4, 4}, {5, 5}, {2, 6}, {3, 4}, {5, 3}, {6, 2}, {1, 7}};
+    const int count = (int)(sizeof(MOVES) / sizeof(MOVES[0]));
+    float cycle = count * 0.6f + 2.8f;
+    float t = fmodf(time, cycle);
+    float fade = fminf(1.0f, (cycle - t) * 2.0f);
+    for (int i = 0; i < count; i++) {
+        float appear = t - i * 0.6f;
+        if (appear < 0.0f) break;
+        float p = fminf(1.0f, appear * 3.0f);
+        Rectangle r = {board.x + MOVES[i][0] * cell + cell * 0.1f, board.y + MOVES[i][1] * cell + cell * 0.1f, cell * 0.8f, cell * 0.8f};
+        bool isX = (i % 2) == 0;
+        Color col = UiAlpha(isX ? CARO_X_COL : CARO_O_COL, fade);
+        CaroDrawShape(isX ? CARO_SHAPE_X : CARO_SHAPE_O, r, 0.0f, col, isX ? CARO_X_EDGE : CARO_O_EDGE,
+                      1.0f - (1.0f - p) * (1.0f - p) * (1.0f - p), 0.0f, 1.0f);
+    }
+    float done = t - count * 0.6f;
+    if (done > 0.0f) {
+        // Vạch vàng nối năm quân X (1,7) -> (5,3)
+        Vector2 a = {board.x + 1.5f * cell, board.y + 7.5f * cell};
+        Vector2 b = {board.x + 5.5f * cell, board.y + 3.5f * cell};
+        float len = sqrtf((b.x - a.x) * (b.x - a.x) + (b.y - a.y) * (b.y - a.y)) + cell * 0.9f;
+        Rectangle bar = {(a.x + b.x) * 0.5f - len * 0.5f, (a.y + b.y) * 0.5f - cell * 0.34f, len, cell * 0.68f};
+        float p = fminf(1.0f, done * 1.8f);
+        CaroDrawShape(CARO_SHAPE_BAR, bar, -45.0f, UiAlpha((Color){255, 222, 120, 235}, fade), (Color){214, 140, 40, 255},
+                      1.0f - (1.0f - p) * (1.0f - p), 0.6f + 0.4f * sinf(time * 4.0f), 0.6f);
+    }
+}
+
+// --------------------------------------------------------------- CỜ VUA 3D
+
+// Hub vẽ tranh vào render texture riêng nên không dựng được cảnh 3D có bóng
+// đổ ở đây; dùng ảnh chụp sẵn từ chính game (assets/chess/textures/hub_*.jpg).
+static void ChessArt(void)
+{
+    if (s_chessArtTried) return;
+    s_chessArtTried = true;
+    const char *hero = ChessAssetPath("textures/hub_hero.jpg");
+    const char *icon = ChessAssetPath("textures/hub_icon.jpg");
+    if (FileExists(hero)) s_chessHero = LoadTexture(hero);
+    if (FileExists(icon)) s_chessIcon = LoadTexture(icon);
+    if (s_chessHero.id > 0) SetTextureFilter(s_chessHero, TEXTURE_FILTER_BILINEAR);
+    if (s_chessIcon.id > 0) SetTextureFilter(s_chessIcon, TEXTURE_FILTER_BILINEAR);
+}
+
+// Phủ kín khung theo kiểu "cover", kèm độ phóng nhẹ (Ken Burns).
+static void DrawCover(Texture2D tex, Rectangle area, float zoom, Vector2 focus)
+{
+    float s = fmaxf(area.width / tex.width, area.height / tex.height) * zoom;
+    float w = area.width / s, h = area.height / s;
+    float x = (tex.width - w) * focus.x, y = (tex.height - h) * focus.y;
+    DrawTexturePro(tex, (Rectangle){x, y, w, h}, area, (Vector2){0.0f, 0.0f}, 0.0f, WHITE);
+}
+
+// Quân mã vẽ bằng khối đơn giản - chỉ dùng khi thiếu ảnh chụp sẵn.
+static void ChessFallback(Rectangle area, float time)
+{
+    FillBackdrop(area, (Color){40, 40, 48, 255}, (Color){10, 10, 14, 255});
+    Bloom(At(area, 0.7f, 0.4f), Unit(area) * 0.8f, (Color){236, 196, 120, 255});
+    float u = Unit(area);
+    float cell = u * 0.14f;
+    for (int y = 0; y < 8; y++) {
+        for (int x = 0; x < 8; x++) {
+            Color c = ((x + y) & 1) ? (Color){210, 208, 202, 255} : (Color){60, 62, 68, 255};
+            DrawRectangleRec((Rectangle){area.x + area.width * 0.55f + x * cell, area.y + area.height * 0.12f + y * cell, cell, cell}, c);
+        }
+    }
+    (void)time;
+}
+
+void HubArtChessIcon(Rectangle area, float time)
+{
+    ChessArt();
+    if (s_chessIcon.id == 0) {
+        ChessFallback(area, time);
+        return;
+    }
+    DrawCover(s_chessIcon, area, 1.0f, (Vector2){0.5f, 0.5f});
+}
+
+void HubArtChessHero(Rectangle area, float time)
+{
+    ChessArt();
+    if (s_chessHero.id == 0) {
+        ChessFallback(area, time);
+        return;
+    }
+    float zoom = 1.04f + 0.04f * sinf(time * 0.12f);
+    DrawCover(s_chessHero, area, zoom, (Vector2){0.72f, 0.5f + 0.1f * sinf(time * 0.09f)});
 }

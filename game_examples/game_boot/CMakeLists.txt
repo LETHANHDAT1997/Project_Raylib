@@ -51,6 +51,8 @@ file(GLOB TETRIS_SOURCES  CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/../tetr
 file(GLOB SPACE_SOURCES   CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/../space_invader/src/*.c")
 file(GLOB SNAKE_SOURCES   CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/../snake/src/*.c")
 file(GLOB FLAPPY_SOURCES  CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/../flappy/src/*.c")
+file(GLOB CARO_SOURCES    CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/../caro/src/*.c")
+file(GLOB CHESS_SOURCES   CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/../chess/src/*.c")
 # Fighter là C++ và chia theo thư mục con (core/entities/characters/render/scenes).
 file(GLOB_RECURSE FIGHTER_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/../fighter/src/*.cpp")
 file(GLOB COMMON_SOURCES  CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/../common/*.c")
@@ -61,6 +63,8 @@ add_executable(game_boot
     ${SPACE_SOURCES}
     ${SNAKE_SOURCES}
     ${FLAPPY_SOURCES}
+    ${CARO_SOURCES}
+    ${CHESS_SOURCES}
     ${FIGHTER_SOURCES}
     ${COMMON_SOURCES}
 )
@@ -78,6 +82,8 @@ target_include_directories(game_boot PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/../space_invader/inc"
     "${CMAKE_CURRENT_SOURCE_DIR}/../snake/inc"
     "${CMAKE_CURRENT_SOURCE_DIR}/../flappy/inc"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../caro/inc"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../chess/inc"
     "${CMAKE_CURRENT_SOURCE_DIR}/../fighter/inc"
 )
 
