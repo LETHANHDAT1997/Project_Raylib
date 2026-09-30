@@ -2,6 +2,8 @@
 #include "caro_rules.h"
 #include "caro_assets.h"
 #include "font_vn.h"
+#include "perf_hint.h"
+#include "rlgl.h"
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -141,8 +143,34 @@ static float TextWidth(const char *text, float size, bool bold)
     return bold ? MeasureTextVNBoldPro(text, size, 0.0f).x : MeasureTextVNPro(text, size, 0.0f).x;
 }
 
+// ------------------------------------------------------------------ chế độ nhẹ
+//
+// Trên GPU yếu (Raspberry Pi 0-3), thứ tốn nhất không phải quân cờ mà là các
+// lớp phủ bán trong suốt chồng lên nhau: bóng mềm 6 tầng quanh bàn cờ và bảng
+// bên, hai quầng sáng lớn ở nền. Chế độ nhẹ "nướng" nền + bàn cờ + khung bảng
+// vào một texture một lần, mỗi khung hình chỉ chép lại nó rồi vẽ phần động.
+
+static RenderTexture2D s_bake = {0};
+static RenderTexture2D s_stoneSprite[2] = {0};   // Quân X / O đã vẽ xong, cùng cỡ bàn với s_bake
+static int  s_bakeN = 0;           // Cỡ bàn đã nướng, 0 = chưa có
+static bool s_baking = false;      // Đang nướng: vẽ đủ chất lượng
+static bool s_frameBaked = false;  // Khung hình hiện tại dùng lớp nướng
+
+// Cỡ bàn đang hiển thị: menu xem trước theo lựa chọn, còn khi chơi theo ván thật.
+static int ShownBoardSize(const CaroGame *game)
+{
+    if (game->state == CARO_STATE_MENU) return game->sizeChoice == 0 ? 15 : 19;
+    return game->board.n;
+}
+
 static void SoftShadow(Rectangle r, float roundness, float spread, float alpha)
 {
+    if (PerfHintLite() && !s_baking) {
+        // Một tầng duy nhất thay cho sáu: mất độ mềm nhưng rẻ hơn sáu lần.
+        Rectangle s = {r.x - spread * 0.3f, r.y + spread * 0.2f, r.width + spread * 0.6f, r.height + spread * 0.5f};
+        DrawRectangleRounded(s, roundness, 12, WithAlpha(BLACK, alpha * 0.5f));
+        return;
+    }
     for (int i = 6; i >= 1; i--) {
         float g = spread * (float)i / 6.0f;
         Rectangle s = {r.x - g, r.y - g + spread * 0.5f, r.width + g * 2.0f, r.height + g * 2.0f};
@@ -215,6 +243,8 @@ static void Button(Rectangle r, const char *label, const char *key, bool primary
 static void DrawBackdrop(float t)
 {
     DrawRectangleGradientV(0, 0, CARO_CANVAS_W, CARO_CANVAS_H, COL_BG_TOP, COL_BG_BOTTOM);
+    // Quầng sáng và bụi nằm DƯỚI bàn cờ nên không đi cùng lớp nướng được.
+    if (PerfHintLite()) return;
     // Vài quầng sáng ấm / lạnh trôi rất chậm
     Vector2 a = {260.0f + sinf(t * 0.15f) * 60.0f, 180.0f + cosf(t * 0.12f) * 40.0f};
     Vector2 b = {1060.0f + cosf(t * 0.11f) * 70.0f, 560.0f + sinf(t * 0.13f) * 50.0f};
@@ -301,9 +331,26 @@ static Rectangle PieceRect(int n, int cell, float scale)
     return (Rectangle){r.x + (r.width - s) * 0.5f, r.y + (r.height - s) * 0.5f, s, s};
 }
 
+static float StoneScale(float anim)
+{
+    return 0.85f + 0.15f * EaseOutBack(anim * 1.4f);
+}
+
 static void DrawStone(int n, int cell, CaroStone s, float anim, float glow, float alpha)
 {
-    float scale = 0.85f + 0.15f * EaseOutBack(anim * 1.4f);
+    int k = (s == CARO_X) ? 0 : 1;
+    if (s_frameBaked && anim >= 1.0f && glow <= 0.001f && s_stoneSprite[k].id > 0) {
+        // Quân đã vẽ xong nét: dán ảnh dựng sẵn. Không đổi shader nên mọi quân
+        // gộp chung một draw call - vẽ bằng shader thì mỗi quân tốn hai draw
+        // call, bàn càng đầy càng chậm (trên Pi, mỗi draw call rất đắt).
+        Texture2D t = s_stoneSprite[k].texture;
+        DrawTexturePro(t, (Rectangle){0.0f, 0.0f, (float)t.width, -(float)t.height},
+                       PieceRect(n, cell, StoneScale(1.0f)), (Vector2){0.0f, 0.0f}, 0.0f,
+                       WithAlpha(WHITE, alpha));
+        return;
+    }
+
+    float scale = StoneScale(anim);
     Color col = WithAlpha(StoneColor(s), alpha);
     CaroDrawShape(StoneShape(s), PieceRect(n, cell, scale), 0.0f, col, StoneEdge(s),
                   EaseOutCubic(anim), glow, 1.0f);
@@ -490,7 +537,7 @@ static void DrawResultBlock(const CaroGame *game, float y)
 static void DrawSidePanel(const CaroGame *game)
 {
     const CaroBoard *b = &game->board;
-    Panel(PANEL);
+    if (!s_frameBaked) Panel(PANEL);
     float x = PANEL.x + 24.0f;
     float y = PANEL.y + 22.0f;
 
@@ -596,7 +643,7 @@ static void DrawMenuDemo(const CaroGame *game)
     float t = fmodf(game->globalTime, cycle);
     float fade = Clamp01((cycle - t) * 2.0f);
 
-    DrawBoard(n, true);
+    if (!s_frameBaked) DrawBoard(n, true);
     for (int i = 0; i < DEMO_COUNT; i++) {
         float appear = t - i * DEMO_STEP;
         if (appear < 0.0f) break;
@@ -657,7 +704,7 @@ static int CurrentOption(const CaroGame *game, CaroMenuOption row)
 static void DrawMenuPanel(const CaroGame *game)
 {
     float t = game->globalTime;
-    Panel(PANEL);
+    if (!s_frameBaked) Panel(PANEL);
     float x = PANEL.x + 28.0f;
 
     // Tiêu đề kèm hai quân X / O nhỏ
@@ -748,10 +795,71 @@ static void DrawPause(const CaroGame *game)
 
 // ------------------------------------------------------------------ tổng
 
+void CaroDrawPrepare(const CaroGame *game)
+{
+    int n = ShownBoardSize(game);
+    if (!PerfHintLite() || (s_bake.id > 0 && s_bakeN == n)) return;
+
+    if (s_bake.id == 0) s_bake = LoadRenderTexture(CARO_CANVAS_W, CARO_CANVAS_H);
+    if (s_bake.id == 0) return;
+
+    s_baking = true;
+    BeginTextureMode(s_bake);
+        ClearBackground(COL_BG_BOTTOM);
+        DrawBackdrop(0.0f);
+        DrawBoard(n, true);
+        Panel(PANEL);
+    EndTextureMode();
+
+    // Ảnh quân X / O đúng cỡ ô của bàn này. Chép thẳng đầu ra shader (kể cả
+    // alpha) thay vì hoà trộn lên nền trong suốt, để khi dán lại ra đúng màu.
+    int px = (int)ceilf(PieceRect(n, 0, StoneScale(1.0f)).width);
+    for (int k = 0; k < 2; k++) {
+        CaroStone s = (k == 0) ? CARO_X : CARO_O;
+        if (s_stoneSprite[k].id > 0) UnloadRenderTexture(s_stoneSprite[k]);
+        s_stoneSprite[k] = LoadRenderTexture(px, px);
+        if (s_stoneSprite[k].id == 0) continue;
+        SetTextureFilter(s_stoneSprite[k].texture, TEXTURE_FILTER_BILINEAR);
+        BeginTextureMode(s_stoneSprite[k]);
+            ClearBackground(BLANK);
+            rlSetBlendFactors(RL_ONE, RL_ZERO, RL_FUNC_ADD);
+            BeginBlendMode(BLEND_CUSTOM);
+                CaroDrawShape(StoneShape(s), (Rectangle){0.0f, 0.0f, (float)px, (float)px}, 0.0f,
+                              StoneColor(s), StoneEdge(s), 1.0f, 0.0f, 1.0f);
+            EndBlendMode();
+        EndTextureMode();
+    }
+
+    s_baking = false;
+    s_bakeN = n;
+}
+
+void CaroDrawRelease(void)
+{
+    if (s_bake.id > 0) UnloadRenderTexture(s_bake);
+    s_bake = (RenderTexture2D){0};
+    for (int k = 0; k < 2; k++) {
+        if (s_stoneSprite[k].id > 0) UnloadRenderTexture(s_stoneSprite[k]);
+        s_stoneSprite[k] = (RenderTexture2D){0};
+    }
+    s_bakeN = 0;
+}
+
 void DrawCaroGame(const CaroGame *game)
 {
-    ClearBackground(COL_BG_BOTTOM);
-    DrawBackdrop(game->globalTime);
+    s_frameBaked = PerfHintLite() && s_bake.id > 0 && s_bakeN == ShownBoardSize(game);
+    if (s_frameBaked) {
+        // Chép nguyên (kể cả alpha) thay vì hoà trộn: kết quả giống hệt vẽ
+        // lại từ đầu, và rẻ hơn vì GPU không phải đọc lại pixel cũ.
+        rlSetBlendFactors(RL_ONE, RL_ZERO, RL_FUNC_ADD);
+        BeginBlendMode(BLEND_CUSTOM);
+            DrawTextureRec(s_bake.texture, (Rectangle){0.0f, 0.0f, (float)CARO_CANVAS_W, -(float)CARO_CANVAS_H},
+                           (Vector2){0.0f, 0.0f}, WHITE);
+        EndBlendMode();
+    } else {
+        ClearBackground(COL_BG_BOTTOM);
+        DrawBackdrop(game->globalTime);
+    }
 
     if (game->state == CARO_STATE_MENU) {
         DrawMenuDemo(game);
@@ -761,12 +869,13 @@ void DrawCaroGame(const CaroGame *game)
     }
 
     // Rung nhẹ khi ván kết thúc
-    float shake = game->shake > 0.0f ? game->shake * 10.0f : 0.0f;
+    // Bàn cờ đã nướng thì đứng yên, nên bỏ rung để quân không lệch khỏi ô.
+    float shake = (game->shake > 0.0f && !s_frameBaked) ? game->shake * 10.0f : 0.0f;
     Camera2D cam = {0};
     cam.zoom = 1.0f;
     cam.offset = (Vector2){sinf(game->globalTime * 70.0f) * shake, cosf(game->globalTime * 53.0f) * shake};
     BeginMode2D(cam);
-        DrawBoard(game->board.n, true);
+        if (!s_frameBaked) DrawBoard(game->board.n, true);
         DrawBoardContents(game);
     EndMode2D();
 

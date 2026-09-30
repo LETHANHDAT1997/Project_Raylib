@@ -300,6 +300,7 @@ void InitCaroGame(CaroGame *game)
 void CloseCaroGame(CaroGame *game)
 {
     CancelThinking(game);
+    CaroDrawRelease();
 }
 
 // ------------------------------------------------------------------ menu
@@ -599,4 +600,6 @@ void UpdateCaroGame(CaroGame *game, float dt)
         case CARO_STATE_PAUSED:  UpdatePaused(game); break;
         case CARO_STATE_OVER:    UpdateOver(game, dt); break;
     }
+
+    CaroDrawPrepare(game);
 }

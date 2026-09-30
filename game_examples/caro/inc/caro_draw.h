@@ -11,6 +11,11 @@
 
 void DrawCaroGame(const CaroGame *game);
 
+// Chế độ đồ hoạ nhẹ (PerfHintLite): dựng sẵn lớp nền tĩnh. Gọi NGOÀI
+// BeginTextureMode (vd. cuối bước Update) vì bên trong có vẽ vào texture riêng.
+void CaroDrawPrepare(const CaroGame *game);
+void CaroDrawRelease(void);
+
 // Bàn cờ
 Rectangle CaroBoardArea(int n);                        // Vùng lưới ô cờ
 Rectangle CaroCellRect(int n, int cell);
