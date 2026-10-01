@@ -1,4 +1,5 @@
 #include "boot_settings.h"
+#include "boot_perf.h"
 #include "raylib.h"
 #include "save_data.h"
 #include <stdio.h>
@@ -30,7 +31,13 @@ static void ImportLegacySettings(const char *legacyPath)
 void BootSettingsLoad(void)
 {
     SaveDataMigrateLegacy("game_boot_settings.txt", ImportLegacySettings);
-    if (!FileExists(SETTINGS_FILE)) return;
+    if (!FileExists(SETTINGS_FILE)) {
+        // Lần chạy đầu: chọn độ mờ / độ đục kính theo phần cứng
+        // (BootPerfInit đã chạy trong main, trước khi nạp cài đặt).
+        s_settings.glassBlur = 0.50f;
+        s_settings.glassTint = BootPerfWeakDevice() ? 0.10f : 0.20f;
+        return;
+    }
 
     FILE *f = fopen(SETTINGS_FILE, "r");
     if (!f) return;
