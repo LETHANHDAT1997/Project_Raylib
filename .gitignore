@@ -101,3 +101,6 @@ build
 game_boot_stats.txt
 game_boot_settings.txt
 arcade_hub_screenshot.png
+
+# Ignore data save
+game_examples/**/*.migrated
